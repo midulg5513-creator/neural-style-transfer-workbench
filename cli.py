@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import sys
+
+from neural_style.validation import ValidationError, require_cuda
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,11 +39,19 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    if args.command == "run":
-        parser.error("The run command is not implemented yet.")
+    try:
+        require_cuda()
+        if args.command == "run":
+            raise NotImplementedError("The run command is not implemented yet.")
 
-    if args.command == "warmup":
-        parser.error("The warmup command is not implemented yet.")
+        if args.command == "warmup":
+            raise NotImplementedError("The warmup command is not implemented yet.")
+    except ValidationError as exc:
+        print(f"Environment error: {exc}", file=sys.stderr)
+        return 2
+    except NotImplementedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     return 0
 
