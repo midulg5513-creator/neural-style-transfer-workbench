@@ -1,0 +1,8 @@
+# Install on the target CUDA-capable machine using the official PyTorch
+# selector so that `torch` and `torchvision` resolve to the correct CUDA build.
+torch>=2.6,<2.8
+torchvision>=0.21,<0.23
+PySide6>=6.8,<6.9
+Pillow>=10.4,<11
+scikit-image>=0.24,<0.26
+pytest>=8.3,<9
