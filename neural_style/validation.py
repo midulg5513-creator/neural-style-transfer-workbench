@@ -11,7 +11,7 @@ from .config import (
     MIN_NUM_STEPS,
     MIN_STYLE_STRENGTH,
 )
-from .utils import ensure_directory, is_supported_image_path
+from .utils import build_output_paths, ensure_directory, is_supported_image_path
 
 
 class ValidationError(RuntimeError):
@@ -90,15 +90,21 @@ def validate_style_strength(value: float) -> float:
     return value
 
 
+def validate_image_size(value: int) -> int:
+    """Validate the requested image resize target."""
+    if value <= 0:
+        raise ValidationError("image_size must be greater than 0.")
+    return value
+
+
 def normalize_output_path(value: str | Path | None) -> Path:
     """Return a safe output path, defaulting into the output directory."""
     if value in (None, ""):
         ensure_directory(DEFAULT_OUTPUT_DIR)
         return DEFAULT_OUTPUT_DIR / "result.png"
 
-    path = Path(value).expanduser()
-    ensure_directory(path.parent if path.parent != Path("") else Path("."))
-    return path
+    image_path, _ = build_output_paths(value)
+    return image_path
 
 
 def build_startup_status_message() -> str:

@@ -35,6 +35,44 @@ Prepare the environment ahead of time by:
 
 Detailed execution commands and warm-up instructions will be added as the CLI and core pipeline are implemented.
 
+## CLI Usage
+
+Create the local environment and install the pinned dependencies:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+```
+
+Warm up the pretrained VGG19 weights before the offline demo:
+
+```powershell
+.\.venv\Scripts\python cli.py warmup
+```
+
+Run one style-transfer pass and save both the image and JSON sidecar:
+
+```powershell
+.\.venv\Scripts\python cli.py run `
+  --content examples\content.jpg `
+  --style examples\style.jpg `
+  --output outputs\demo-result.png `
+  --steps 300 `
+  --style-strength 1.0 `
+  --image-size 768 `
+  --keep-color
+```
+
+Optional local-style transfer mask:
+
+```powershell
+.\.venv\Scripts\python cli.py run `
+  --content examples\content.jpg `
+  --style examples\style.jpg `
+  --mask examples\mask.png `
+  --output outputs\masked-result.png
+```
+
 ## Repository Layout
 
 ```text
