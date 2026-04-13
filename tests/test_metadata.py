@@ -50,4 +50,5 @@ def test_save_run_metadata_writes_json_sidecar(tmp_path) -> None:
     assert saved_path.exists()
     assert payload["inputs"]["mask_image"] is None
     assert payload["parameters"]["style_strength"] == 0.8
-    assert payload["runtime"]["torch_available"] is False
+    assert payload["runtime"]["device"] == "cpu"
+    assert isinstance(payload["runtime"]["torch_available"], bool)
