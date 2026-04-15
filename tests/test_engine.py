@@ -7,7 +7,12 @@ pytest.importorskip("torchvision")
 
 from torch import nn
 
-from neural_style.engine import EngineError, ensure_cuda_device, run_style_transfer
+from neural_style.engine import (
+    EngineError,
+    StyleTransferCancelled,
+    ensure_cuda_device,
+    run_style_transfer,
+)
 
 
 def test_ensure_cuda_device_rejects_cpu_request(monkeypatch) -> None:
@@ -74,3 +79,32 @@ def test_run_style_transfer_executes_with_injected_backbone(monkeypatch) -> None
     assert result.applied_keep_color is False
     assert result.applied_mask is False
     assert len(progress_events) == 2
+
+
+def test_run_style_transfer_can_be_cancelled(monkeypatch) -> None:
+    monkeypatch.setattr("neural_style.engine.ensure_cuda_device", lambda device=None: torch.device("cpu"))
+
+    toy_backbone = nn.Sequential(
+        nn.Conv2d(3, 4, kernel_size=3, padding=1),
+        nn.ReLU(inplace=False),
+        nn.Conv2d(4, 4, kernel_size=3, padding=1),
+        nn.ReLU(inplace=False),
+        nn.Conv2d(4, 4, kernel_size=3, padding=1),
+        nn.ReLU(inplace=False),
+        nn.Conv2d(4, 4, kernel_size=3, padding=1),
+        nn.ReLU(inplace=False),
+        nn.Conv2d(4, 4, kernel_size=3, padding=1),
+        nn.ReLU(inplace=False),
+    )
+    content = torch.rand(1, 3, 8, 8)
+    style = torch.rand(1, 3, 8, 8)
+
+    with pytest.raises(StyleTransferCancelled, match="cancelled"):
+        run_style_transfer(
+            content,
+            style,
+            num_steps=2,
+            device="cuda",
+            cnn=toy_backbone,
+            cancel_callback=lambda: True,
+        )

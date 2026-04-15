@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+import types
 
 import pytest
 
@@ -31,6 +33,23 @@ def test_build_startup_status_message_reports_missing_cuda(monkeypatch) -> None:
     message = build_startup_status_message()
 
     assert message == CUDA_REQUIRED_MESSAGE
+
+
+def test_build_startup_status_message_reports_gpu_name_when_cuda_ready(
+    monkeypatch,
+) -> None:
+    fake_torch = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(
+            current_device=lambda: 0,
+            get_device_name=lambda index: "Fake RTX GPU",
+        )
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setattr("neural_style.validation.is_cuda_ready", lambda: True)
+
+    message = build_startup_status_message()
+
+    assert "Fake RTX GPU" in message
 
 
 def test_validate_image_path_rejects_missing_file(tmp_path) -> None:
