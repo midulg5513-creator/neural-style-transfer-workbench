@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-APP_TITLE = "Neural Style Transfer App"
-APP_ORGANIZATION = "Course Project"
+APP_TITLE = "神经风格迁移演示系统"
+APP_ORGANIZATION = "计算机视觉课程项目"
 APP_WINDOW_WIDTH = 1280
 APP_WINDOW_HEIGHT = 800
 APP_MINIMUM_WIDTH = 1180

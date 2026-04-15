@@ -20,12 +20,12 @@ class ValidationError(RuntimeError):
 
 
 CUDA_REQUIRED_MESSAGE = (
-    "A CUDA-capable NVIDIA GPU is required for this project. "
-    "PyTorch did not report CUDA as available on this machine."
+    "当前项目必须使用支持 CUDA 的 NVIDIA 显卡。"
+    "PyTorch 在本机环境中未检测到可用的 CUDA。"
 )
 TORCH_MISSING_MESSAGE = (
-    "PyTorch is not installed in the current environment. Install the project "
-    "dependencies on the target CUDA-capable machine before running the app."
+    "当前环境未安装 PyTorch。请先在目标 CUDA 机器上安装项目依赖，"
+    "再启动本程序。"
 )
 
 
@@ -52,16 +52,16 @@ def require_cuda() -> "torch.device":
 def validate_image_path(value: str | Path, field_name: str) -> Path:
     """Validate an image-like filesystem path."""
     if value in (None, ""):
-        raise ValidationError(f"Please choose a {field_name}.")
+        raise ValidationError(f"请选择{field_name}。")
 
     path = Path(value).expanduser()
     if not path.exists():
-        raise ValidationError(f"{field_name} does not exist: {path}")
+        raise ValidationError(f"{field_name}不存在：{path}")
     if not path.is_file():
-        raise ValidationError(f"{field_name} is not a file: {path}")
+        raise ValidationError(f"{field_name}不是有效文件：{path}")
     if not is_supported_image_path(path):
         raise ValidationError(
-            f"{field_name} must be one of the supported image formats: {path}"
+            f"{field_name}格式不受支持：{path}"
         )
     return path
 
@@ -79,7 +79,7 @@ def validate_num_steps(value: int) -> int:
     """Validate the optimization-step count."""
     if not MIN_NUM_STEPS <= value <= MAX_NUM_STEPS:
         raise ValidationError(
-            f"num_steps must be between {MIN_NUM_STEPS} and {MAX_NUM_STEPS}."
+            f"迭代步数必须在 {MIN_NUM_STEPS} 到 {MAX_NUM_STEPS} 之间。"
         )
     return value
 
@@ -88,8 +88,8 @@ def validate_style_strength(value: float) -> float:
     """Validate the user-selected style strength."""
     if not MIN_STYLE_STRENGTH <= value <= MAX_STYLE_STRENGTH:
         raise ValidationError(
-            "style_strength must be between "
-            f"{MIN_STYLE_STRENGTH} and {MAX_STYLE_STRENGTH}."
+            "风格强度必须在 "
+            f"{MIN_STYLE_STRENGTH} 到 {MAX_STYLE_STRENGTH} 之间。"
         )
     return value
 
@@ -97,7 +97,7 @@ def validate_style_strength(value: float) -> float:
 def validate_image_size(value: int) -> int:
     """Validate the requested image resize target."""
     if value <= 0:
-        raise ValidationError("image_size must be greater than 0.")
+        raise ValidationError("输出尺寸必须大于 0。")
     return value
 
 
@@ -117,7 +117,7 @@ def validate_output_image_path(value: str | Path | None) -> Path:
     if image_path.suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
         supported = ", ".join(sorted(SUPPORTED_IMAGE_SUFFIXES))
         raise ValidationError(
-            "output image must use one of the supported suffixes: "
+            "输出图像必须使用以下受支持的后缀之一："
             f"{supported}"
         )
     return image_path
@@ -132,7 +132,7 @@ def build_startup_status_message() -> str:
     if is_cuda_ready():
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         return (
-            "CUDA detected. The project can continue with GPU-only execution.\n"
-            f"Active GPU: {device_name}"
+            "已检测到 CUDA 环境，可以按 GPU-only 模式运行。\n"
+            f"当前显卡：{device_name}"
         )
     return CUDA_REQUIRED_MESSAGE

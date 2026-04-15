@@ -108,7 +108,7 @@ class PreviewPane(QFrame):
         self._source_pixmap = None
         self.image_label.setPixmap(QPixmap())
         self.image_label.setText(self._placeholder_text)
-        self.caption_label.setText(caption or "No file selected.")
+        self.caption_label.setText(caption or "尚未选择文件。")
 
     def set_preview_pixmap(self, pixmap: QPixmap, caption: str) -> None:
         """Show a loaded pixmap inside the preview card."""
@@ -121,7 +121,7 @@ class PreviewPane(QFrame):
         """Decode preview bytes and display them in the preview card."""
         pixmap = QPixmap()
         if not pixmap.loadFromData(preview_bytes, "PNG"):
-            self.clear_preview("Preview data could not be decoded.")
+            self.clear_preview("预览图数据无法解析。")
             return
         self.set_preview_pixmap(pixmap, caption)
 
@@ -171,76 +171,131 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             """
             QMainWindow {
-                background: #f3f5f7;
+                background: #eef3ef;
+            }
+            QWidget {
+                color: #17324d;
+                font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC";
+                font-size: 13px;
+            }
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QFrame#heroCard {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #17324d,
+                    stop: 0.55 #1f5f66,
+                    stop: 1 #2f7f67
+                );
+                border-radius: 24px;
+                min-height: 150px;
+            }
+            QLabel#heroTitle {
+                color: #f5fbf8;
+                font-size: 29px;
+                font-weight: 700;
+            }
+            QLabel#heroSubtitle {
+                color: #d9ede8;
+                font-size: 14px;
+            }
+            QLabel#heroBadge {
+                background: rgba(255, 255, 255, 0.16);
+                border-radius: 999px;
+                color: #f5fbf8;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 6px 12px;
             }
             QGroupBox {
-                background: #ffffff;
-                border: 1px solid #d7dde5;
-                border-radius: 10px;
+                background: #fbfdfb;
+                border: 1px solid #d8e4de;
+                border-radius: 16px;
                 font-weight: 600;
-                margin-top: 12px;
-                padding-top: 8px;
+                margin-top: 14px;
+                padding-top: 10px;
             }
             QGroupBox::title {
-                left: 12px;
-                padding: 0 4px;
-            }
-            QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit {
-                background: #fbfcfe;
-                border: 1px solid #c8d1dc;
-                border-radius: 8px;
-                padding: 6px 8px;
-            }
-            QPushButton {
-                background: #0f6cbd;
-                border: none;
-                border-radius: 8px;
-                color: white;
-                min-height: 34px;
-                padding: 0 14px;
-            }
-            QPushButton:disabled {
-                background: #9fb7cc;
-                color: #eef4f8;
-            }
-            QPushButton#secondaryButton {
-                background: #dde6f0;
+                left: 14px;
+                padding: 0 6px;
                 color: #17324d;
             }
+            QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit {
+                background: #f7fbf9;
+                border: 1px solid #c7d6ce;
+                border-radius: 10px;
+                padding: 7px 10px;
+            }
+            QPushButton {
+                background: #1f6f66;
+                border: none;
+                border-radius: 10px;
+                color: white;
+                font-weight: 700;
+                min-height: 36px;
+                padding: 0 16px;
+            }
+            QPushButton:disabled {
+                background: #a9c0ba;
+                color: #eef5f2;
+            }
+            QPushButton#secondaryButton {
+                background: #d9ebe6;
+                color: #164944;
+            }
+            QPushButton#dangerButton {
+                background: #d16456;
+            }
             QProgressBar {
-                background: #dde6f0;
-                border: 1px solid #cad4df;
-                border-radius: 8px;
+                background: #dfebe6;
+                border: 1px solid #cad8d2;
+                border-radius: 10px;
                 min-height: 24px;
                 text-align: center;
+                font-weight: 700;
             }
             QProgressBar::chunk {
-                background: #0f6cbd;
-                border-radius: 7px;
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #1f6f66,
+                    stop: 1 #3a8a62
+                );
+                border-radius: 9px;
             }
             QFrame#previewPane {
                 background: #ffffff;
-                border: 1px solid #d7dde5;
-                border-radius: 12px;
+                border: 1px solid #d8e4de;
+                border-radius: 18px;
             }
             QLabel#previewTitle {
                 color: #17324d;
-                font-size: 14px;
+                font-size: 15px;
                 font-weight: 700;
             }
             QLabel#previewImage {
-                background: #f6f9fc;
-                border: 1px dashed #b5c4d4;
-                border-radius: 10px;
-                color: #607387;
-                padding: 10px;
+                background: #f5faf8;
+                border: 1px dashed #b8cbc3;
+                border-radius: 14px;
+                color: #5f746d;
+                padding: 14px;
             }
             QLabel#previewCaption {
-                color: #425466;
+                color: #4d635d;
             }
             QLabel#environmentLabel {
-                border-radius: 8px;
-                padding: 10px 12px;
+                border-radius: 12px;
+                font-weight: 600;
+                padding: 12px 14px;
+            }
+            QLabel#statusLabel {
+                color: #3a5458;
+                line-height: 1.45;
+            }
+            QTextEdit#summaryBox {
+                background: #f8fbfa;
+                line-height: 1.55;
             }
             """
         )
@@ -252,16 +307,6 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(18, 18, 18, 18)
         root_layout.setSpacing(14)
 
-        header_layout = QVBoxLayout()
-        title_label = QLabel("Neural Style Transfer Desktop Studio")
-        title_label.setStyleSheet("font-size: 24px; font-weight: 700; color: #17324d;")
-        subtitle_label = QLabel(
-            "GPU-only local workflow with content/style selection, parameter tuning, and saved-output metadata."
-        )
-        subtitle_label.setStyleSheet("color: #4a6075;")
-        header_layout.addWidget(title_label)
-        header_layout.addWidget(subtitle_label)
-
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._build_control_panel())
         splitter.addWidget(self._build_preview_panel())
@@ -269,9 +314,42 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([420, 820])
 
-        root_layout.addLayout(header_layout)
+        root_layout.addWidget(self._build_header_card())
         root_layout.addWidget(splitter, 1)
         self.setCentralWidget(central)
+
+    def _build_header_card(self) -> QFrame:
+        """Build the top hero card for the demo-oriented interface."""
+        card = QFrame()
+        card.setObjectName("heroCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(14)
+
+        title_label = QLabel("神经风格迁移桌面演示界面")
+        title_label.setObjectName("heroTitle")
+        subtitle_label = QLabel(
+            "本地 GPU 风格迁移流程，支持内容图、风格图、可选遮罩、保留原色与参数 JSON 留档。"
+        )
+        subtitle_label.setObjectName("heroSubtitle")
+        subtitle_label.setWordWrap(True)
+
+        badge_row = QHBoxLayout()
+        badge_row.setSpacing(8)
+        for text in ("本地桌面版", "GPU 专用", "离线演示可用"):
+            badge_row.addWidget(self._create_badge(text))
+        badge_row.addStretch(1)
+
+        layout.addLayout(badge_row)
+        layout.addWidget(title_label)
+        layout.addWidget(subtitle_label)
+        return card
+
+    def _create_badge(self, text: str) -> QLabel:
+        """Create a small rounded badge used in the header."""
+        badge = QLabel(text)
+        badge.setObjectName("heroBadge")
+        return badge
 
     def _build_control_panel(self) -> QWidget:
         """Build the left-side form panel with inputs and actions."""
@@ -302,28 +380,29 @@ class MainWindow(QMainWindow):
         preview_grid = QGridLayout()
         preview_grid.setSpacing(12)
         self.content_preview = PreviewPane(
-            "Content Preview",
-            "The selected content image will appear here.",
+            "内容图预览",
+            "选择内容图后，会在这里显示缩略预览。",
         )
         self.style_preview = PreviewPane(
-            "Style Preview",
-            "The selected style image will appear here.",
+            "风格图预览",
+            "选择风格图后，会在这里显示缩略预览。",
         )
         self.result_preview = PreviewPane(
-            "Result Preview",
-            "The generated image preview will appear here after a successful run.",
+            "结果预览",
+            "生成完成后，会在这里显示输出结果。",
         )
         preview_grid.addWidget(self.content_preview, 0, 0)
         preview_grid.addWidget(self.style_preview, 0, 1)
         preview_grid.addWidget(self.result_preview, 1, 0, 1, 2)
 
-        summary_group = QGroupBox("Run Summary")
+        summary_group = QGroupBox("结果与记录")
         summary_layout = QVBoxLayout(summary_group)
         self.output_summary = QTextEdit()
+        self.output_summary.setObjectName("summaryBox")
         self.output_summary.setReadOnly(True)
         self.output_summary.setMinimumHeight(170)
         self.output_summary.setPlainText(
-            "Saved image path, metadata path, and runtime summary will appear here."
+            "输出图像路径、参数 JSON 路径和本次运行摘要会显示在这里。"
         )
         summary_layout.addWidget(self.output_summary)
 
@@ -333,7 +412,7 @@ class MainWindow(QMainWindow):
 
     def _build_environment_group(self) -> QGroupBox:
         """Build the environment-status section."""
-        group = QGroupBox("Environment")
+        group = QGroupBox("运行环境")
         layout = QVBoxLayout(group)
         layout.setSpacing(10)
 
@@ -341,13 +420,14 @@ class MainWindow(QMainWindow):
         self.environment_label.setWordWrap(True)
         self.environment_label.setObjectName("environmentLabel")
 
-        self.status_label = QLabel("Ready. Choose the content and style inputs to configure a run.")
+        self.status_label = QLabel("当前已就绪。请选择内容图和风格图，然后设置参数开始生成。")
+        self.status_label.setObjectName("statusLabel")
         self.status_label.setWordWrap(True)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Idle")
+        self.progress_bar.setFormat("待命")
 
         layout.addWidget(self.environment_label)
         layout.addWidget(self.status_label)
@@ -356,34 +436,38 @@ class MainWindow(QMainWindow):
 
     def _build_input_group(self) -> QGroupBox:
         """Build file path controls for content, style, mask, and output."""
-        group = QGroupBox("Inputs And Output")
+        group = QGroupBox("输入与输出")
         layout = QVBoxLayout(group)
         layout.setSpacing(12)
 
         self.content_input, self.content_browse_button = self._create_path_row(
             layout,
-            "Content image",
+            "内容图像",
+            placeholder_text="请选择内容图，例如：examples\\content.jpg",
         )
         self.style_input, self.style_browse_button = self._create_path_row(
             layout,
-            "Style image",
+            "风格图像",
+            placeholder_text="请选择风格图，例如：examples\\style.jpg",
         )
         self.mask_input, self.mask_browse_button = self._create_path_row(
             layout,
-            "Mask image (optional)",
+            "遮罩图像（可选）",
             include_clear_button=True,
+            placeholder_text="局部风格迁移时可选，用于限定生效区域。",
         )
         self.output_input, self.output_browse_button = self._create_path_row(
             layout,
-            "Output image",
+            "输出图像",
             save_dialog=True,
+            placeholder_text="默认会输出到 outputs\\result.png，并同步生成 JSON 参数文件。",
         )
         self.output_input.setText(str(default_output_path()))
         return group
 
     def _build_parameter_group(self) -> QGroupBox:
         """Build parameter widgets for the NST run settings."""
-        group = QGroupBox("Parameters")
+        group = QGroupBox("参数设置")
         form = QFormLayout(group)
         form.setContentsMargins(16, 18, 16, 14)
         form.setSpacing(12)
@@ -404,34 +488,34 @@ class MainWindow(QMainWindow):
         self.image_size_spin.setSingleStep(64)
         self.image_size_spin.setValue(DEFAULT_IMAGE_SIZE)
 
-        self.keep_color_checkbox = QCheckBox("Preserve the original content colors")
+        self.keep_color_checkbox = QCheckBox("保留原图色彩")
 
-        form.addRow("Optimization steps", self.steps_spin)
-        form.addRow("Style strength", self.style_strength_spin)
-        form.addRow("Image size", self.image_size_spin)
-        form.addRow("Keep color", self.keep_color_checkbox)
+        form.addRow("优化步数", self.steps_spin)
+        form.addRow("风格强度", self.style_strength_spin)
+        form.addRow("图像尺寸", self.image_size_spin)
+        form.addRow("色彩保留", self.keep_color_checkbox)
         return group
 
     def _build_action_group(self) -> QGroupBox:
         """Build the primary run and cancel action area."""
-        group = QGroupBox("Actions")
+        group = QGroupBox("执行控制")
         layout = QVBoxLayout(group)
         layout.setSpacing(10)
 
         button_row = QHBoxLayout()
-        self.run_button = QPushButton("Start Transfer")
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setObjectName("secondaryButton")
+        self.run_button = QPushButton("开始生成")
+        self.cancel_button = QPushButton("取消任务")
+        self.cancel_button.setObjectName("dangerButton")
         self.cancel_button.setEnabled(False)
 
         button_row.addWidget(self.run_button)
         button_row.addWidget(self.cancel_button)
 
         self.action_hint_label = QLabel(
-            "Runs execute on a background worker thread so the window stays responsive."
+            "任务会在后台线程中执行，界面不会因为风格迁移而卡死。生成完成后会同时保存图像与 JSON 参数记录。"
         )
         self.action_hint_label.setWordWrap(True)
-        self.action_hint_label.setStyleSheet("color: #506579;")
+        self.action_hint_label.setStyleSheet("color: #4d635d; line-height: 1.45;")
 
         layout.addLayout(button_row)
         layout.addWidget(self.action_hint_label)
@@ -444,6 +528,7 @@ class MainWindow(QMainWindow):
         *,
         include_clear_button: bool = False,
         save_dialog: bool = False,
+        placeholder_text: str = "",
     ) -> tuple[QLineEdit, QPushButton]:
         """Create a labeled file-picker row."""
         label = QLabel(label_text)
@@ -453,7 +538,9 @@ class MainWindow(QMainWindow):
         row_layout.setSpacing(8)
 
         line_edit = QLineEdit()
-        browse_button = QPushButton("Browse")
+        line_edit.setPlaceholderText(placeholder_text)
+        line_edit.setClearButtonEnabled(True)
+        browse_button = QPushButton("选择")
         browse_button.setObjectName("secondaryButton")
         browse_button.setProperty("save_dialog", save_dialog)
 
@@ -461,7 +548,7 @@ class MainWindow(QMainWindow):
         row_layout.addWidget(browse_button)
 
         if include_clear_button:
-            clear_button = QPushButton("Clear")
+            clear_button = QPushButton("清空")
             clear_button.setObjectName("secondaryButton")
             clear_button.clicked.connect(line_edit.clear)
             row_layout.addWidget(clear_button)
@@ -492,7 +579,7 @@ class MainWindow(QMainWindow):
         """Open an image file picker and store the selected path."""
         selected_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select image",
+            "选择图像文件",
             str(Path.cwd()),
             GUI_IMAGE_FILE_FILTER,
         )
@@ -504,7 +591,7 @@ class MainWindow(QMainWindow):
         """Open a save dialog for the generated output image path."""
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Choose output image path",
+            "选择输出图像路径",
             self.output_input.text().strip() or str(default_output_path()),
             GUI_IMAGE_FILE_FILTER,
         )
@@ -519,7 +606,7 @@ class MainWindow(QMainWindow):
                 "background: #e5f4eb; color: #1e6a39;"
             )
             self.environment_label.setText(
-                "CUDA ready.\n"
+                "CUDA 环境就绪。\n"
                 f"{status_text}"
             )
         else:
@@ -527,7 +614,7 @@ class MainWindow(QMainWindow):
                 "background: #fbe8e8; color: #8a1f1f;"
             )
             self.environment_label.setText(
-                "Execution blocked until CUDA is available.\n"
+                "当前无法启动生成任务。\n"
                 f"{status_text}"
             )
         self.run_button.setEnabled(self._cuda_ready and self._worker_thread is None)
@@ -550,35 +637,39 @@ class MainWindow(QMainWindow):
     ) -> None:
         """Load preview bytes from a valid path or restore the placeholder."""
         if not raw_path:
-            preview_pane.clear_preview("No file selected.")
+            preview_pane.clear_preview("尚未选择文件。")
             return
 
         path = Path(raw_path).expanduser()
         if not path.exists() or not path.is_file():
-            preview_pane.clear_preview(f"File not found: {path}")
+            preview_pane.clear_preview(f"未找到文件：{path}")
             return
 
         try:
             preview_bytes = load_preview_png_bytes(path)
         except Exception as exc:  # pragma: no cover - preview is best-effort UI behavior
-            preview_pane.clear_preview(f"Preview unavailable: {exc}")
+            preview_pane.clear_preview(f"预览加载失败：{exc}")
             return
 
-        preview_pane.set_preview_bytes(preview_bytes, str(path))
+        preview_pane.set_preview_bytes(preview_bytes, self._format_preview_caption(path))
+
+    def _format_preview_caption(self, path: Path) -> str:
+        """Build a compact caption for a preview pane."""
+        return f"{path.name}\n{path}"
 
     def _collect_run_request(self) -> StyleTransferRunRequest:
         """Read the current UI values and validate them into a run request."""
         content_path = validate_image_path(
             self.content_input.text().strip(),
-            "content image",
+            "内容图像",
         )
         style_path = validate_image_path(
             self.style_input.text().strip(),
-            "style image",
+            "风格图像",
         )
         mask_path = validate_optional_image_path(
             self.mask_input.text().strip(),
-            "mask image",
+            "遮罩图像",
         )
         require_cuda()
         output_path = validate_output_image_path(self.output_input.text().strip())
@@ -608,12 +699,12 @@ class MainWindow(QMainWindow):
             self._cuda_ready = is_cuda_ready()
             self._refresh_environment_status()
             self.output_summary.setPlainText(str(exc))
-            self._show_error("Invalid configuration", str(exc))
+            self._show_error("配置无效", str(exc))
             return
 
-        self.result_preview.clear_preview("Waiting for the current run to finish.")
+        self.result_preview.clear_preview("当前任务执行中，生成完成后会显示新结果。")
         self._set_running_state(True)
-        self._set_status("Starting worker thread...", 0, "Preparing")
+        self._set_status("正在启动后台任务...", 0, "准备中")
 
         self._worker_thread = QThread(self)
         self._worker = StyleTransferWorker(request)
@@ -638,7 +729,7 @@ class MainWindow(QMainWindow):
         if self._worker is None:
             return
         self.cancel_button.setEnabled(False)
-        self._set_status("Cancellation requested. Waiting for a safe checkpoint...", self.progress_bar.value())
+        self._set_status("已请求取消，正在等待安全检查点...", self.progress_bar.value())
         self.cancel_requested.emit()
 
     def _handle_worker_progress(self, progress: StyleTransferRunProgress) -> None:
@@ -647,8 +738,8 @@ class MainWindow(QMainWindow):
         if progress.content_loss is not None and progress.style_loss is not None:
             message = (
                 f"{progress.message}\n"
-                f"Content loss: {progress.content_loss:.4f} | "
-                f"Style loss: {progress.style_loss:.4f}"
+                f"内容损失：{progress.content_loss:.4f} | "
+                f"风格损失：{progress.style_loss:.4f}"
             )
         self._set_status(message, progress.percent)
 
@@ -656,34 +747,34 @@ class MainWindow(QMainWindow):
         """Handle a completed background NST run."""
         self.result_preview.set_preview_bytes(
             result.preview_png_bytes,
-            str(result.output_image_path),
+            self._format_preview_caption(result.output_image_path),
         )
         self.output_summary.setPlainText(
             "\n".join(
                 [
                     result.metadata_summary,
-                    f"Content loss: {result.content_loss:.6f}",
-                    f"Style loss: {result.style_loss:.6f}",
-                    f"Mask applied: {result.applied_mask}",
+                    f"内容损失：{result.content_loss:.6f}",
+                    f"风格损失：{result.style_loss:.6f}",
+                    f"应用遮罩：{'是' if result.applied_mask else '否'}",
                 ]
             )
         )
-        self._set_status("Run completed successfully.", 100, "Complete")
+        self._set_status("生成完成，结果与参数记录已写入磁盘。", 100, "已完成")
         self._set_running_state(False)
 
     def _handle_worker_failure(self, message: str) -> None:
         """Handle a background worker failure."""
-        self.result_preview.clear_preview("Run failed before a new result was produced.")
+        self.result_preview.clear_preview("本次任务执行失败，未生成新的结果图像。")
         self.output_summary.setPlainText(message)
-        self._show_error("Run failed", message)
-        self._set_status("Run failed. Review the error message and adjust the inputs.", 0, "Failed")
+        self._show_error("生成失败", message)
+        self._set_status("生成失败，请检查输入路径、参数和 CUDA 环境。", 0, "失败")
         self._set_running_state(False)
 
     def _handle_worker_cancelled(self, message: str) -> None:
         """Handle a cooperatively cancelled NST run."""
-        self.result_preview.clear_preview("The current run was cancelled.")
-        self._set_status(message or "Run cancelled.", 0, "Cancelled")
-        self.output_summary.setPlainText("The current run was cancelled before completion.")
+        self.result_preview.clear_preview("本次任务已取消，没有生成新的结果图像。")
+        self._set_status(message or "任务已取消。", 0, "已取消")
+        self.output_summary.setPlainText("当前任务在完成前已被取消。")
         self._set_running_state(False)
 
     def _handle_worker_finished(self) -> None:

@@ -162,19 +162,25 @@ def save_run_metadata(
 def format_run_summary(metadata: RunMetadata | Mapping[str, Any]) -> str:
     """Build a short text summary suitable for the desktop UI."""
     payload = metadata.to_dict() if isinstance(metadata, RunMetadata) else _normalize_json_value(dict(metadata))
+    inputs = payload.get("inputs", {})
     parameters = payload.get("parameters", {})
     runtime = payload.get("runtime", {})
     artifacts = payload.get("artifacts", {})
+    keep_color = parameters.get("keep_color", None)
+    mask_image = inputs.get("mask_image", None)
 
     lines = [
-        f"Created at: {payload.get('created_at', 'unknown')}",
-        f"Output image: {artifacts.get('output_image', 'unknown')}",
-        f"Metadata JSON: {artifacts.get('metadata_file', 'unknown')}",
-        f"Device: {runtime.get('cuda_device_name') or runtime.get('device', 'unknown')}",
-        f"Steps: {parameters.get('num_steps', 'unknown')}",
-        f"Style strength: {parameters.get('style_strength', 'unknown')}",
-        f"Image size: {parameters.get('image_size', 'unknown')}",
-        f"Keep color: {parameters.get('keep_color', 'unknown')}",
+        f"生成时间：{payload.get('created_at', '未知')}",
+        f"内容图像：{inputs.get('content_image', '未知')}",
+        f"风格图像：{inputs.get('style_image', '未知')}",
+        f"输出图像：{artifacts.get('output_image', '未知')}",
+        f"参数记录：{artifacts.get('metadata_file', '未知')}",
+        f"运行设备：{runtime.get('cuda_device_name') or runtime.get('device', '未知')}",
+        f"迭代步数：{parameters.get('num_steps', '未知')}",
+        f"风格强度：{parameters.get('style_strength', '未知')}",
+        f"图像尺寸：{parameters.get('image_size', '未知')}",
+        f"保留原色：{'是' if keep_color is True else '否' if keep_color is False else '未知'}",
+        f"使用遮罩：{'是' if mask_image else '否'}",
     ]
 
     return "\n".join(lines)

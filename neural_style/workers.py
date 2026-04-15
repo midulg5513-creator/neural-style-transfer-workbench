@@ -97,34 +97,34 @@ def execute_style_transfer_request(
             )
         )
 
-    emit("setup", "Validating CUDA environment...", 2)
+    emit("setup", "正在检查 CUDA 运行环境...", 2)
 
     def raise_if_cancelled() -> None:
         if cancel_handler is not None and cancel_handler():
-            raise StyleTransferCancelled("Style transfer was cancelled.")
+            raise StyleTransferCancelled("风格迁移任务已取消。")
 
     device = require_cuda()
     raise_if_cancelled()
 
-    content_path = validate_image_path(request.content_path, "content image")
-    style_path = validate_image_path(request.style_path, "style image")
-    mask_path = validate_optional_image_path(request.mask_path, "mask image")
+    content_path = validate_image_path(request.content_path, "内容图像")
+    style_path = validate_image_path(request.style_path, "风格图像")
+    mask_path = validate_optional_image_path(request.mask_path, "遮罩图像")
     num_steps = validate_num_steps(request.num_steps)
     style_strength = validate_style_strength(request.style_strength)
     image_size = validate_image_size(request.image_size)
     output_path = validate_output_image_path(request.output_path)
     image_output_path, metadata_output_path = build_output_paths(output_path)
 
-    emit("setup", "Loading content image...", 8)
+    emit("setup", "正在加载内容图像...", 8)
     content_tensor = load_image_tensor(content_path, target_size=image_size, device=device)
     raise_if_cancelled()
 
-    emit("setup", "Loading style image...", 12)
+    emit("setup", "正在加载风格图像...", 12)
     style_tensor = load_image_tensor(style_path, target_size=image_size, device=device)
     raise_if_cancelled()
 
     if mask_path is not None:
-        emit("setup", "Loading mask image...", 16)
+        emit("setup", "正在加载遮罩图像...", 16)
         mask_tensor = load_mask_tensor(mask_path, target_size=image_size, device=device)
         raise_if_cancelled()
     else:
@@ -134,7 +134,7 @@ def execute_style_transfer_request(
         percent = 20 + round((step / total) * 70)
         emit(
             "optimizing",
-            f"Optimizing on GPU: step {step}/{total}",
+            f"GPU 优化中：第 {step}/{total} 步",
             percent,
             current_step=step,
             total_steps=total,
@@ -142,7 +142,7 @@ def execute_style_transfer_request(
             style_loss=style_loss,
         )
 
-    emit("setup", "Starting style transfer...", 20)
+    emit("setup", "正在启动风格迁移...", 20)
     result = run_style_transfer(
         content_tensor,
         style_tensor,
@@ -155,7 +155,7 @@ def execute_style_transfer_request(
         cancel_callback=cancel_handler,
     )
 
-    emit("saving", "Saving output image...", 94)
+    emit("saving", "正在保存输出图像...", 94)
     raise_if_cancelled()
     saved_image_path = save_tensor_image(result.output_tensor, image_output_path)
     preview_png_bytes = tensor_to_preview_png_bytes(result.output_tensor)
@@ -175,11 +175,11 @@ def execute_style_transfer_request(
         device=device,
     )
 
-    emit("saving", "Writing metadata sidecar...", 98)
+    emit("saving", "正在写入 JSON 参数记录...", 98)
     raise_if_cancelled()
     saved_metadata_path = save_run_metadata(metadata)
 
-    emit("complete", "Run completed successfully.", 100)
+    emit("complete", "生成完成。", 100)
     return StyleTransferRunResult(
         output_image_path=saved_image_path,
         metadata_path=saved_metadata_path,
@@ -221,7 +221,7 @@ class StyleTransferWorker(QObject):
         except (ValidationError, EngineError, OSError, RuntimeError, ValueError) as exc:
             self.failed.emit(str(exc))
         except Exception as exc:  # pragma: no cover - defensive boundary for GUI use
-            self.failed.emit(f"Unexpected error: {exc}")
+            self.failed.emit(f"发生未预期错误：{exc}")
         else:
             self.succeeded.emit(result)
         finally:
