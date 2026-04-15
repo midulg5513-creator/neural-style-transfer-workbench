@@ -20,6 +20,10 @@ class EngineError(RuntimeError):
     """Raised when the NST engine cannot execute safely."""
 
 
+class StyleTransferCancelled(EngineError):
+    """Raised when a running NST job is cancelled cooperatively."""
+
+
 @dataclass(frozen=True)
 class StyleTransferResult:
     """Structured result returned by the NST engine."""
@@ -34,6 +38,7 @@ class StyleTransferResult:
 
 
 ProgressCallback = Callable[[int, int, float, float], None]
+CancelCallback = Callable[[], bool]
 
 
 def ensure_cuda_device(device: torch.device | str | None = None) -> torch.device:
@@ -72,6 +77,7 @@ def run_style_transfer(
     content_weight: float = DEFAULT_CONTENT_WEIGHT,
     style_weight: float = DEFAULT_STYLE_WEIGHT,
     progress_callback: ProgressCallback | None = None,
+    cancel_callback: CancelCallback | None = None,
 ) -> StyleTransferResult:
     """Run neural style transfer and return the stylized tensor plus summary."""
     if num_steps <= 0:
@@ -113,9 +119,16 @@ def run_style_transfer(
     last_style_loss = 0.0
     scaled_style_weight = style_weight * style_strength
 
+    def raise_if_cancelled() -> None:
+        if cancel_callback is not None and cancel_callback():
+            raise StyleTransferCancelled("Style transfer was cancelled.")
+
     for step in range(1, num_steps + 1):
+        raise_if_cancelled()
+
         def closure() -> torch.Tensor:
             nonlocal last_content_loss, last_style_loss
+            raise_if_cancelled()
             with torch.no_grad():
                 input_image.clamp_(0.0, 1.0)
 
@@ -134,6 +147,7 @@ def run_style_transfer(
             return total_loss
 
         optimizer.step(closure)
+        raise_if_cancelled()
         if progress_callback is not None:
             progress_callback(step, num_steps, last_content_loss, last_style_loss)
 

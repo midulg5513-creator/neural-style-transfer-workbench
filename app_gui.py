@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QProgressBar,
     QScrollArea,
@@ -51,7 +52,23 @@ from neural_style.config import (
     MIN_STYLE_STRENGTH,
 )
 from neural_style.utils import default_output_path
-from neural_style.validation import build_startup_status_message, is_cuda_ready
+from neural_style.validation import (
+    ValidationError,
+    build_startup_status_message,
+    is_cuda_ready,
+    normalize_output_path,
+    validate_image_path,
+    validate_image_size,
+    validate_num_steps,
+    validate_optional_image_path,
+    validate_style_strength,
+)
+from neural_style.workers import (
+    StyleTransferRunProgress,
+    StyleTransferRunRequest,
+    StyleTransferRunResult,
+    StyleTransferWorker,
+)
 
 
 class PreviewPane(QFrame):
@@ -123,9 +140,13 @@ class PreviewPane(QFrame):
 class MainWindow(QMainWindow):
     """Primary application window for desktop style-transfer control."""
 
+    cancel_requested = Signal()
+
     def __init__(self) -> None:
         super().__init__()
         self._cuda_ready = is_cuda_ready()
+        self._worker_thread: QThread | None = None
+        self._worker: StyleTransferWorker | None = None
 
         self.setWindowTitle(APP_TITLE)
         self.resize(APP_WINDOW_WIDTH, APP_WINDOW_HEIGHT)
@@ -397,14 +418,14 @@ class MainWindow(QMainWindow):
         button_row.addWidget(self.run_button)
         button_row.addWidget(self.cancel_button)
 
-        hint_label = QLabel(
-            "The GPU worker thread will be attached next. For now, use this screen to configure inputs and parameters."
+        self.action_hint_label = QLabel(
+            "Runs execute on a background worker thread so the window stays responsive."
         )
-        hint_label.setWordWrap(True)
-        hint_label.setStyleSheet("color: #506579;")
+        self.action_hint_label.setWordWrap(True)
+        self.action_hint_label.setStyleSheet("color: #506579;")
 
         layout.addLayout(button_row)
-        layout.addWidget(hint_label)
+        layout.addWidget(self.action_hint_label)
         return group
 
     def _create_path_row(
@@ -452,7 +473,9 @@ class MainWindow(QMainWindow):
             lambda: self._pick_image_file(self.mask_input)
         )
         self.output_browse_button.clicked.connect(self._pick_output_file)
-        self.run_button.setEnabled(False)
+        self.run_button.clicked.connect(self._start_run)
+        self.cancel_button.clicked.connect(self._request_cancel)
+        self.run_button.setEnabled(self._cuda_ready)
 
     def _pick_image_file(self, target_input: QLineEdit) -> None:
         """Open an image file picker and store the selected path."""
@@ -495,6 +518,166 @@ class MainWindow(QMainWindow):
                 "Execution blocked until CUDA is available.\n"
                 f"{status_text}"
             )
+        self.run_button.setEnabled(self._cuda_ready and self._worker_thread is None)
+
+    def _collect_run_request(self) -> StyleTransferRunRequest:
+        """Read the current UI values and validate them into a run request."""
+        content_path = validate_image_path(
+            self.content_input.text().strip(),
+            "content image",
+        )
+        style_path = validate_image_path(
+            self.style_input.text().strip(),
+            "style image",
+        )
+        mask_path = validate_optional_image_path(
+            self.mask_input.text().strip(),
+            "mask image",
+        )
+        output_path = normalize_output_path(self.output_input.text().strip())
+        num_steps = validate_num_steps(self.steps_spin.value())
+        style_strength = validate_style_strength(self.style_strength_spin.value())
+        image_size = validate_image_size(self.image_size_spin.value())
+
+        return StyleTransferRunRequest(
+            content_path=content_path,
+            style_path=style_path,
+            mask_path=mask_path,
+            output_path=output_path,
+            num_steps=num_steps,
+            style_strength=style_strength,
+            image_size=image_size,
+            keep_color=self.keep_color_checkbox.isChecked(),
+        )
+
+    def _start_run(self) -> None:
+        """Validate the form and launch the background worker."""
+        if self._worker_thread is not None:
+            return
+
+        try:
+            request = self._collect_run_request()
+        except ValidationError as exc:
+            self._show_error("Invalid configuration", str(exc))
+            return
+
+        self.result_preview.clear_preview("Waiting for the current run to finish.")
+        self._set_running_state(True)
+        self._set_status("Starting worker thread...", 0, "Preparing")
+
+        self._worker_thread = QThread(self)
+        self._worker = StyleTransferWorker(request)
+        self._worker.moveToThread(self._worker_thread)
+
+        self._worker_thread.started.connect(self._worker.run)
+        self._worker.progress.connect(self._handle_worker_progress)
+        self._worker.succeeded.connect(self._handle_worker_success)
+        self._worker.failed.connect(self._handle_worker_failure)
+        self._worker.cancelled.connect(self._handle_worker_cancelled)
+        self._worker.finished.connect(self._worker_thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._worker.finished.connect(self._handle_worker_finished)
+        self._worker_thread.finished.connect(self._worker_thread.deleteLater)
+        self._worker_thread.finished.connect(self._cleanup_worker)
+        self.cancel_requested.connect(self._worker.cancel)
+
+        self._worker_thread.start()
+
+    def _request_cancel(self) -> None:
+        """Forward a cooperative cancellation request to the worker thread."""
+        if self._worker is None:
+            return
+        self.cancel_button.setEnabled(False)
+        self._set_status("Cancellation requested. Waiting for a safe checkpoint...", self.progress_bar.value())
+        self.cancel_requested.emit()
+
+    def _handle_worker_progress(self, progress: StyleTransferRunProgress) -> None:
+        """Reflect worker progress updates in the GUI."""
+        message = progress.message
+        if progress.content_loss is not None and progress.style_loss is not None:
+            message = (
+                f"{progress.message}\n"
+                f"Content loss: {progress.content_loss:.4f} | "
+                f"Style loss: {progress.style_loss:.4f}"
+            )
+        self._set_status(message, progress.percent)
+
+    def _handle_worker_success(self, result: StyleTransferRunResult) -> None:
+        """Handle a completed background NST run."""
+        self.output_summary.setPlainText(
+            "\n".join(
+                [
+                    "Run completed successfully.",
+                    f"Output image: {result.output_image_path}",
+                    f"Metadata JSON: {result.metadata_path}",
+                    f"Device: {result.device}",
+                    f"Content loss: {result.content_loss:.6f}",
+                    f"Style loss: {result.style_loss:.6f}",
+                    f"Keep color: {result.applied_keep_color}",
+                    f"Mask applied: {result.applied_mask}",
+                ]
+            )
+        )
+        self._set_status("Run completed successfully.", 100, "Complete")
+        self._set_running_state(False)
+
+    def _handle_worker_failure(self, message: str) -> None:
+        """Handle a background worker failure."""
+        self._show_error("Run failed", message)
+        self._set_status("Run failed. Review the error message and adjust the inputs.", 0, "Failed")
+        self._set_running_state(False)
+
+    def _handle_worker_cancelled(self, message: str) -> None:
+        """Handle a cooperatively cancelled NST run."""
+        self._set_status(message or "Run cancelled.", 0, "Cancelled")
+        self.output_summary.setPlainText("The current run was cancelled before completion.")
+        self._set_running_state(False)
+
+    def _handle_worker_finished(self) -> None:
+        """Keep the main window responsive once the worker exits."""
+        self.cancel_button.setEnabled(False)
+
+    def _cleanup_worker(self) -> None:
+        """Drop thread and worker references after the Qt thread exits."""
+        if self._worker is not None:
+            try:
+                self.cancel_requested.disconnect(self._worker.cancel)
+            except (RuntimeError, TypeError):
+                pass
+        self._worker = None
+        self._worker_thread = None
+        self._refresh_environment_status()
+
+    def _set_running_state(self, is_running: bool) -> None:
+        """Toggle the form controls between idle and running states."""
+        for widget in (
+            self.content_input,
+            self.style_input,
+            self.mask_input,
+            self.output_input,
+            self.content_browse_button,
+            self.style_browse_button,
+            self.mask_browse_button,
+            self.output_browse_button,
+            self.steps_spin,
+            self.style_strength_spin,
+            self.image_size_spin,
+            self.keep_color_checkbox,
+        ):
+            widget.setEnabled(not is_running)
+
+        self.run_button.setEnabled((not is_running) and self._cuda_ready)
+        self.cancel_button.setEnabled(is_running)
+
+    def _set_status(self, message: str, progress_value: int, progress_text: str | None = None) -> None:
+        """Update the status label and progress bar together."""
+        self.status_label.setText(message)
+        self.progress_bar.setValue(max(0, min(100, progress_value)))
+        self.progress_bar.setFormat(progress_text or f"{self.progress_bar.value()}%")
+
+    def _show_error(self, title: str, message: str) -> None:
+        """Show a blocking error dialog with the provided message."""
+        QMessageBox.critical(self, title, message)
 
 
 def main() -> int:
