@@ -157,3 +157,24 @@ def save_run_metadata(
         encoding="utf-8",
     )
     return target_path
+
+
+def format_run_summary(metadata: RunMetadata | Mapping[str, Any]) -> str:
+    """Build a short text summary suitable for the desktop UI."""
+    payload = metadata.to_dict() if isinstance(metadata, RunMetadata) else _normalize_json_value(dict(metadata))
+    parameters = payload.get("parameters", {})
+    runtime = payload.get("runtime", {})
+    artifacts = payload.get("artifacts", {})
+
+    lines = [
+        f"Created at: {payload.get('created_at', 'unknown')}",
+        f"Output image: {artifacts.get('output_image', 'unknown')}",
+        f"Metadata JSON: {artifacts.get('metadata_file', 'unknown')}",
+        f"Device: {runtime.get('cuda_device_name') or runtime.get('device', 'unknown')}",
+        f"Steps: {parameters.get('num_steps', 'unknown')}",
+        f"Style strength: {parameters.get('style_strength', 'unknown')}",
+        f"Image size: {parameters.get('image_size', 'unknown')}",
+        f"Keep color: {parameters.get('keep_color', 'unknown')}",
+    ]
+
+    return "\n".join(lines)

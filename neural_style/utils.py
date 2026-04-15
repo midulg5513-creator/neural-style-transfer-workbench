@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 from .config import (
@@ -9,6 +10,8 @@ from .config import (
     DEFAULT_METADATA_SUFFIX,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_OUTPUT_STEM,
+    GUI_PREVIEW_HEIGHT,
+    GUI_PREVIEW_WIDTH,
     SUPPORTED_IMAGE_SUFFIXES,
 )
 
@@ -157,6 +160,45 @@ def tensor_to_pil_image(tensor: "torch.Tensor") -> "Image.Image":
     )
     uint8_array = (np.rint(image_array * 255.0)).astype("uint8")
     return Image.fromarray(uint8_array, mode="RGB")
+
+
+def build_preview_image(
+    image: "Image.Image",
+    max_size: tuple[int, int] = (GUI_PREVIEW_WIDTH, GUI_PREVIEW_HEIGHT),
+) -> "Image.Image":
+    """Resize an image copy so it fits within the preview viewport."""
+    from PIL import Image
+
+    preview = image.copy()
+    preview.thumbnail(max_size, resample=Image.Resampling.LANCZOS)
+    return preview
+
+
+def pil_image_to_png_bytes(image: "Image.Image") -> bytes:
+    """Encode a PIL image as PNG bytes for Qt preview loading."""
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def load_preview_png_bytes(
+    path: str | Path,
+    max_size: tuple[int, int] = (GUI_PREVIEW_WIDTH, GUI_PREVIEW_HEIGHT),
+) -> bytes:
+    """Load a disk image and return preview-sized PNG bytes."""
+    return pil_image_to_png_bytes(
+        build_preview_image(load_rgb_image(path, target_size=max(max_size)), max_size=max_size)
+    )
+
+
+def tensor_to_preview_png_bytes(
+    tensor: "torch.Tensor",
+    max_size: tuple[int, int] = (GUI_PREVIEW_WIDTH, GUI_PREVIEW_HEIGHT),
+) -> bytes:
+    """Convert a generated tensor into preview-sized PNG bytes."""
+    return pil_image_to_png_bytes(
+        build_preview_image(tensor_to_pil_image(tensor), max_size=max_size)
+    )
 
 
 def save_tensor_image(

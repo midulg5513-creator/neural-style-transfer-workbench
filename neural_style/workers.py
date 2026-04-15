@@ -10,8 +10,13 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from .engine import EngineError, StyleTransferCancelled, run_style_transfer
 from .mask import load_mask_tensor
-from .metadata import build_run_metadata, save_run_metadata
-from .utils import build_output_paths, load_image_tensor, save_tensor_image
+from .metadata import build_run_metadata, format_run_summary, save_run_metadata
+from .utils import (
+    build_output_paths,
+    load_image_tensor,
+    save_tensor_image,
+    tensor_to_preview_png_bytes,
+)
 from .validation import (
     ValidationError,
     require_cuda,
@@ -56,6 +61,8 @@ class StyleTransferRunResult:
 
     output_image_path: Path
     metadata_path: Path
+    preview_png_bytes: bytes
+    metadata_summary: str
     device: str
     content_loss: float
     style_loss: float
@@ -149,6 +156,7 @@ def execute_style_transfer_request(
     emit("saving", "Saving output image...", 94)
     raise_if_cancelled()
     saved_image_path = save_tensor_image(result.output_tensor, image_output_path)
+    preview_png_bytes = tensor_to_preview_png_bytes(result.output_tensor)
 
     metadata = build_run_metadata(
         content_path=content_path,
@@ -173,6 +181,8 @@ def execute_style_transfer_request(
     return StyleTransferRunResult(
         output_image_path=saved_image_path,
         metadata_path=saved_metadata_path,
+        preview_png_bytes=preview_png_bytes,
+        metadata_summary=format_run_summary(metadata),
         device=result.device,
         content_loss=result.content_loss,
         style_loss=result.style_loss,

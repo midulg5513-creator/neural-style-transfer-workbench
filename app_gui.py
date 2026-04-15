@@ -51,7 +51,7 @@ from neural_style.config import (
     MIN_NUM_STEPS,
     MIN_STYLE_STRENGTH,
 )
-from neural_style.utils import default_output_path
+from neural_style.utils import default_output_path, load_preview_png_bytes
 from neural_style.validation import (
     ValidationError,
     build_startup_status_message,
@@ -115,6 +115,14 @@ class PreviewPane(QFrame):
         self.image_label.setText("")
         self.caption_label.setText(caption)
         self._apply_scaled_pixmap()
+
+    def set_preview_bytes(self, preview_bytes: bytes, caption: str) -> None:
+        """Decode preview bytes and display them in the preview card."""
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(preview_bytes, "PNG"):
+            self.clear_preview("Preview data could not be decoded.")
+            return
+        self.set_preview_pixmap(pixmap, caption)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         """Keep the displayed preview scaled with the widget size."""
@@ -475,6 +483,8 @@ class MainWindow(QMainWindow):
         self.output_browse_button.clicked.connect(self._pick_output_file)
         self.run_button.clicked.connect(self._start_run)
         self.cancel_button.clicked.connect(self._request_cancel)
+        self.content_input.editingFinished.connect(self._refresh_source_previews)
+        self.style_input.editingFinished.connect(self._refresh_source_previews)
         self.run_button.setEnabled(self._cuda_ready)
 
     def _pick_image_file(self, target_input: QLineEdit) -> None:
@@ -487,6 +497,7 @@ class MainWindow(QMainWindow):
         )
         if selected_path:
             target_input.setText(selected_path)
+            self._refresh_source_previews()
 
     def _pick_output_file(self) -> None:
         """Open a save dialog for the generated output image path."""
@@ -519,6 +530,40 @@ class MainWindow(QMainWindow):
                 f"{status_text}"
             )
         self.run_button.setEnabled(self._cuda_ready and self._worker_thread is None)
+
+    def _refresh_source_previews(self) -> None:
+        """Load previews for the currently selected content and style images."""
+        self._set_preview_from_path(
+            self.content_preview,
+            self.content_input.text().strip(),
+        )
+        self._set_preview_from_path(
+            self.style_preview,
+            self.style_input.text().strip(),
+        )
+
+    def _set_preview_from_path(
+        self,
+        preview_pane: PreviewPane,
+        raw_path: str,
+    ) -> None:
+        """Load preview bytes from a valid path or restore the placeholder."""
+        if not raw_path:
+            preview_pane.clear_preview("No file selected.")
+            return
+
+        path = Path(raw_path).expanduser()
+        if not path.exists() or not path.is_file():
+            preview_pane.clear_preview(f"File not found: {path}")
+            return
+
+        try:
+            preview_bytes = load_preview_png_bytes(path)
+        except Exception as exc:  # pragma: no cover - preview is best-effort UI behavior
+            preview_pane.clear_preview(f"Preview unavailable: {exc}")
+            return
+
+        preview_pane.set_preview_bytes(preview_bytes, str(path))
 
     def _collect_run_request(self) -> StyleTransferRunRequest:
         """Read the current UI values and validate them into a run request."""
@@ -604,16 +649,16 @@ class MainWindow(QMainWindow):
 
     def _handle_worker_success(self, result: StyleTransferRunResult) -> None:
         """Handle a completed background NST run."""
+        self.result_preview.set_preview_bytes(
+            result.preview_png_bytes,
+            str(result.output_image_path),
+        )
         self.output_summary.setPlainText(
             "\n".join(
                 [
-                    "Run completed successfully.",
-                    f"Output image: {result.output_image_path}",
-                    f"Metadata JSON: {result.metadata_path}",
-                    f"Device: {result.device}",
+                    result.metadata_summary,
                     f"Content loss: {result.content_loss:.6f}",
                     f"Style loss: {result.style_loss:.6f}",
-                    f"Keep color: {result.applied_keep_color}",
                     f"Mask applied: {result.applied_mask}",
                 ]
             )
