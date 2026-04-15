@@ -1,119 +1,163 @@
-# Neural Style Transfer App
+# 神经风格迁移演示系统
 
-Computer vision final-project desktop application for neural style transfer.
+计算机视觉期末项目，本地桌面形态，技术栈为 `Python + PyTorch + PySide6`。
 
-## Current Scope
+当前已完成：
 
-- Local desktop application built with PySide6
-- Neural style transfer based on pretrained VGG19 features
-- Required feature extensions:
-  - `style_strength`
-  - `keep_color`
-  - `mask`
-- Output image plus JSON metadata sidecar for each run
+- 基于 `VGG19 + Gatys + LBFGS` 的神经风格迁移主流程
+- `style_strength`、`keep_color`、`mask` 三个扩展功能
+- PySide6 图形界面，支持后台线程运行、进度反馈、预览对比、结果保存
+- 输出图像与同名 `JSON` 参数记录文件
 
-## Runtime Requirement
+## 运行前提
 
-This project is intentionally scoped for a CUDA-capable NVIDIA machine.
-CPU fallback is not part of the current plan.
+本项目是明确的 `仅 GPU` 方案，不提供 CPU 回退。
 
-Before running the app, confirm that:
+运行机器必须满足：
 
-1. PyTorch is installed with a CUDA-enabled build.
-2. `torch.cuda.is_available()` returns `True`.
-3. The target machine is the same prepared environment intended for the final demo.
+- Windows
+- NVIDIA 显卡
+- PyTorch CUDA 版本安装正确
+- `torch.cuda.is_available()` 返回 `True`
 
-## Offline Demo Preparation
+## 已验证环境
 
-The final demo must not depend on live downloads during presentation.
-Prepare the environment ahead of time by:
+以下版本已经在当前演示机器上实际验证通过：
 
-1. Installing project dependencies in a local `.venv`.
-2. Pre-downloading the pretrained VGG19 weights on the target machine.
-3. Verifying that the cached weights remain available offline.
-4. Running a smoke test before demo day.
+- Python: `3.13.0`
+- torch: `2.7.1+cu126`
+- torchvision: `0.22.1+cu126`
+- PySide6: `6.8.3`
+- Pillow: `12.1.1`
+- scikit-image: `0.25.2`
+- pytest: `8.4.2`
+- GPU: `NVIDIA GeForce RTX 4060 Laptop GPU`
+- PyTorch CUDA build: `12.6`
 
-The CLI and desktop GUI are both available in the prepared CUDA environment.
+## 安装步骤
 
-## CLI Usage
-
-Detailed Chinese setup and operation guide:
-
-- `docs/中文操作手册与配置指南.md`
-
-Create the local environment and install the pinned dependencies:
+在项目根目录执行：
 
 ```powershell
 python -m venv .venv
+.\.venv\Scripts\python -m pip install --upgrade pip
 .\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-Warm up the pretrained VGG19 weights before the offline demo:
+安装完成后，先验证 CUDA 是否真的可用：
+
+```powershell
+.\.venv\Scripts\python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO CUDA')"
+```
+
+预期结果：
+
+- `torch.__version__` 为 `2.7.1+cu126`
+- `torch.cuda.is_available()` 为 `True`
+- 能正确输出 `NVIDIA GeForce RTX 4060 Laptop GPU`
+
+## 离线预热
+
+答辩前必须先预热一次预训练权重：
 
 ```powershell
 .\.venv\Scripts\python cli.py warmup
 ```
 
-Run one style-transfer pass and save both the image and JSON sidecar:
+当前机器上的缓存目录已经验证为：
+
+```text
+C:\Users\33124\.cache\torch\hub\checkpoints
+```
+
+其中 `VGG19` 权重文件应存在：
+
+```text
+vgg19-dcbb9e9d.pth
+```
+
+如果这个文件没有缓存成功，不要直接进入离线演示。
+
+## CLI 快速运行
 
 ```powershell
 .\.venv\Scripts\python cli.py run `
-  --content examples\content.jpg `
-  --style examples\style.jpg `
-  --output outputs\demo-result.png `
+  --content .\你的内容图.png `
+  --style .\你的风格图.png `
+  --output .\outputs\demo-result.png `
   --steps 300 `
   --style-strength 1.0 `
   --image-size 768 `
   --keep-color
 ```
 
-Optional local-style transfer mask:
+如需局部风格迁移，可额外加入：
 
 ```powershell
-.\.venv\Scripts\python cli.py run `
-  --content examples\content.jpg `
-  --style examples\style.jpg `
-  --mask examples\mask.png `
-  --output outputs\masked-result.png
+  --mask .\你的遮罩图.png
 ```
 
-## GUI Usage
-
-Launch the desktop interface from the prepared virtual environment:
+## GUI 运行
 
 ```powershell
 .\.venv\Scripts\python app_gui.py
 ```
 
-GUI flow:
+GUI 当前已支持完整演示流程：
 
-1. Select a content image and a style image.
-2. Optionally select a mask image.
-3. Choose the output image path or keep the default `outputs\result.png`.
-4. Adjust steps, style strength, image size, and `keep_color`.
-5. Start the run and wait for the progress bar, previews, and saved-output summary.
+1. 选择内容图和风格图
+2. 可选选择遮罩图
+3. 设置输出图像路径
+4. 调整步数、风格强度、图像尺寸、保留原色
+5. 点击“开始生成”
+6. 查看进度条、三块预览和结果摘要
 
-## GUI Troubleshooting
+## 输出说明
 
-- If the `Start Transfer` button is disabled, CUDA is not available in the current environment.
-- If the app reports `Please choose a content image.` or `Please choose a style image.`, the required input path is still empty.
-- If the app reports an unsupported output suffix, use `.png`, `.jpg`, `.jpeg`, `.bmp`, or `.webp`.
-- If a run is cancelled, the GUI returns to an idle state and no new result image is kept for that cancelled job.
-- If the app fails during execution, verify that the selected files are valid local images and that the CUDA-enabled PyTorch environment still reports `torch.cuda.is_available() == True`.
+每次成功运行后，默认会在 `outputs/` 下得到两份文件：
 
-## Repository Layout
+- 结果图像，例如 `outputs\demo-result.png`
+- 参数记录，例如 `outputs\demo-result.json`
 
-```text
-.
-├─ app_gui.py
-├─ cli.py
-├─ neural_style/
-├─ examples/
-├─ outputs/
-└─ tests/
+JSON 会记录：
+
+- 输入图路径
+- 输出图路径
+- 迭代步数
+- 风格强度
+- 图像尺寸
+- 是否保留原色
+- 运行设备与 PyTorch 信息
+
+## 演示前冒烟清单
+
+正式展示前建议按这个顺序检查：
+
+1. `nvidia-smi` 能正常执行
+2. `.\.venv\Scripts\python -c "import torch; print(torch.cuda.is_available())"` 输出 `True`
+3. `.\.venv\Scripts\python cli.py warmup` 成功
+4. `.\.venv\Scripts\python app_gui.py` 能正常启动
+5. 用一组小图做一次快速生成，确认图片和 JSON 都能落盘
+
+推荐快速冒烟命令：
+
+```powershell
+.\.venv\Scripts\python cli.py run `
+  --content .\你的内容图.png `
+  --style .\你的风格图.png `
+  --output .\outputs\smoke.png `
+  --steps 50 `
+  --style-strength 1.0 `
+  --image-size 256
 ```
 
-## Outputs
+## 常见问题
 
-Generated result images should be written to `outputs/`.
-Each output image should have a matching JSON metadata file that records the input files, parameters, device context, and output location.
+- 如果“开始生成”按钮不可点，通常是 CUDA 不可用。
+- 如果提示找不到内容图或风格图，先检查路径是否真实存在。
+- 如果提示输出后缀不支持，请使用 `.png`、`.jpg`、`.jpeg`、`.bmp` 或 `.webp`。
+- 如果第一次运行很慢，通常是 CUDA 初始化和模型权重首次加载导致，答辩前先做 `warmup`。
+
+## 参考文档
+
+- `docs/中文操作手册与配置指南.md`

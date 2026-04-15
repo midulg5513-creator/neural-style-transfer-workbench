@@ -132,7 +132,7 @@ def build_startup_status_message() -> str:
     if is_cuda_ready():
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         return (
-            "已检测到 CUDA 环境，可以按 GPU-only 模式运行。\n"
+            "已检测到 CUDA 环境，可以按仅 GPU 模式运行。\n"
             f"当前显卡：{device_name}"
         )
     return CUDA_REQUIRED_MESSAGE

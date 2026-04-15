@@ -1,8 +1,11 @@
-# Install on the target CUDA-capable machine using the official PyTorch
-# selector so that `torch` and `torchvision` resolve to the correct CUDA build.
-torch>=2.6,<2.8
-torchvision>=0.21,<0.23
-PySide6>=6.8,<6.9
-Pillow>=10.4,<11
-scikit-image>=0.24,<0.26
-pytest>=8.3,<9
+# Final tested dependency set for the target Windows + CUDA demo machine.
+# `--extra-index-url` keeps PyPI available while allowing the exact cu126
+# PyTorch wheels to resolve from the official PyTorch package index.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.7.1+cu126
+torchvision==0.22.1+cu126
+PySide6==6.8.3
+Pillow==12.1.1
+scikit-image==0.25.2
+pytest==8.4.2
