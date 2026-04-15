@@ -1,2 +1,9 @@
-*
+# Ignore generated rehearsal outputs and metadata sidecars.
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.webp
+*.json
+smoke-assets/
 !.gitignore

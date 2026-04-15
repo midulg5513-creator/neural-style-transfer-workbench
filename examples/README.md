@@ -1,15 +1,33 @@
-# Example Assets
+# 示例素材说明
 
-This directory is reserved for curated demo assets used during development and final presentation.
+本目录用于放置正式演示或报告截图时使用的示例素材。
 
-Planned asset types:
+建议至少准备三类文件：
 
-- `content.*`: input content images
-- `style.*`: input style images
-- `mask.*`: optional mask images for local stylization
+- `content.*`
+  - 内容图，主体结构清晰，建议人物、建筑或轮廓明显的场景图
+- `style.*`
+  - 风格图，纹理、笔触或色彩特征要足够明显
+- `mask.*`
+  - 可选遮罩图，用于局部风格迁移，白色区域越明显，局部效果越容易观察
 
-Guidelines:
+建议的排练素材标准：
 
-1. Keep the example set small and stable.
-2. Prefer images that produce repeatable visual results with the chosen defaults.
-3. Validate all final report screenshots against this curated set on the target CUDA machine.
+1. 内容图和风格图都尽量选稳定、容易复现结果的图片。
+2. 正式答辩前至少固定一组最终展示素材，不要现场临时换图。
+3. 先用较小尺寸和较少步数做冒烟，再切换到正式展示参数。
+4. 如果使用遮罩图，尽量让前景与背景边界清晰，便于解释局部风格迁移效果。
+
+推荐的命名方式：
+
+- `content-demo.png`
+- `style-demo.png`
+- `mask-demo.png`
+
+推荐的排练参数：
+
+- `--steps 50`
+- `--style-strength 1.0`
+- `--image-size 256`
+
+这组参数已经用于本机快速排练，适合在演示前确认 GPU、CLI、GUI、结果保存与 JSON 记录链路是否正常。
