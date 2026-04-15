@@ -56,11 +56,12 @@ from neural_style.validation import (
     ValidationError,
     build_startup_status_message,
     is_cuda_ready,
-    normalize_output_path,
+    require_cuda,
     validate_image_path,
     validate_image_size,
     validate_num_steps,
     validate_optional_image_path,
+    validate_output_image_path,
     validate_style_strength,
 )
 from neural_style.workers import (
@@ -579,7 +580,8 @@ class MainWindow(QMainWindow):
             self.mask_input.text().strip(),
             "mask image",
         )
-        output_path = normalize_output_path(self.output_input.text().strip())
+        require_cuda()
+        output_path = validate_output_image_path(self.output_input.text().strip())
         num_steps = validate_num_steps(self.steps_spin.value())
         style_strength = validate_style_strength(self.style_strength_spin.value())
         image_size = validate_image_size(self.image_size_spin.value())
@@ -603,6 +605,9 @@ class MainWindow(QMainWindow):
         try:
             request = self._collect_run_request()
         except ValidationError as exc:
+            self._cuda_ready = is_cuda_ready()
+            self._refresh_environment_status()
+            self.output_summary.setPlainText(str(exc))
             self._show_error("Invalid configuration", str(exc))
             return
 
@@ -668,12 +673,15 @@ class MainWindow(QMainWindow):
 
     def _handle_worker_failure(self, message: str) -> None:
         """Handle a background worker failure."""
+        self.result_preview.clear_preview("Run failed before a new result was produced.")
+        self.output_summary.setPlainText(message)
         self._show_error("Run failed", message)
         self._set_status("Run failed. Review the error message and adjust the inputs.", 0, "Failed")
         self._set_running_state(False)
 
     def _handle_worker_cancelled(self, message: str) -> None:
         """Handle a cooperatively cancelled NST run."""
+        self.result_preview.clear_preview("The current run was cancelled.")
         self._set_status(message or "Run cancelled.", 0, "Cancelled")
         self.output_summary.setPlainText("The current run was cancelled before completion.")
         self._set_running_state(False)

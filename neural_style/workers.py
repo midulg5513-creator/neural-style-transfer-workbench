@@ -24,6 +24,7 @@ from .validation import (
     validate_image_size,
     validate_num_steps,
     validate_optional_image_path,
+    validate_output_image_path,
     validate_style_strength,
 )
 
@@ -111,7 +112,8 @@ def execute_style_transfer_request(
     num_steps = validate_num_steps(request.num_steps)
     style_strength = validate_style_strength(request.style_strength)
     image_size = validate_image_size(request.image_size)
-    image_output_path, metadata_output_path = build_output_paths(request.output_path)
+    output_path = validate_output_image_path(request.output_path)
+    image_output_path, metadata_output_path = build_output_paths(output_path)
 
     emit("setup", "Loading content image...", 8)
     content_tensor = load_image_tensor(content_path, target_size=image_size, device=device)

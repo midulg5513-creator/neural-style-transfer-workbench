@@ -33,9 +33,13 @@ Prepare the environment ahead of time by:
 3. Verifying that the cached weights remain available offline.
 4. Running a smoke test before demo day.
 
-Detailed execution commands and warm-up instructions will be added as the CLI and core pipeline are implemented.
+The CLI and desktop GUI are both available in the prepared CUDA environment.
 
 ## CLI Usage
+
+Detailed Chinese setup and operation guide:
+
+- `docs/中文操作手册与配置指南.md`
 
 Create the local environment and install the pinned dependencies:
 
@@ -72,6 +76,30 @@ Optional local-style transfer mask:
   --mask examples\mask.png `
   --output outputs\masked-result.png
 ```
+
+## GUI Usage
+
+Launch the desktop interface from the prepared virtual environment:
+
+```powershell
+.\.venv\Scripts\python app_gui.py
+```
+
+GUI flow:
+
+1. Select a content image and a style image.
+2. Optionally select a mask image.
+3. Choose the output image path or keep the default `outputs\result.png`.
+4. Adjust steps, style strength, image size, and `keep_color`.
+5. Start the run and wait for the progress bar, previews, and saved-output summary.
+
+## GUI Troubleshooting
+
+- If the `Start Transfer` button is disabled, CUDA is not available in the current environment.
+- If the app reports `Please choose a content image.` or `Please choose a style image.`, the required input path is still empty.
+- If the app reports an unsupported output suffix, use `.png`, `.jpg`, `.jpeg`, `.bmp`, or `.webp`.
+- If a run is cancelled, the GUI returns to an idle state and no new result image is kept for that cancelled job.
+- If the app fails during execution, verify that the selected files are valid local images and that the CUDA-enabled PyTorch environment still reports `torch.cuda.is_available() == True`.
 
 ## Repository Layout
 

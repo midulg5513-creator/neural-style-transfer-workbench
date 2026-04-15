@@ -13,6 +13,7 @@ from neural_style.validation import (
     validate_image_path,
     validate_image_size,
     validate_num_steps,
+    validate_output_image_path,
     validate_style_strength,
 )
 
@@ -39,6 +40,11 @@ def test_validate_image_path_rejects_missing_file(tmp_path) -> None:
         validate_image_path(missing_path, "content image")
 
 
+def test_validate_image_path_rejects_empty_value() -> None:
+    with pytest.raises(ValidationError, match="Please choose a content image"):
+        validate_image_path("", "content image")
+
+
 def test_validate_num_steps_rejects_out_of_range() -> None:
     with pytest.raises(ValidationError, match="num_steps"):
         validate_num_steps(1)
@@ -58,3 +64,8 @@ def test_normalize_output_path_adds_png_suffix(tmp_path) -> None:
     output_path = normalize_output_path(tmp_path / "styled-output")
 
     assert output_path == Path(tmp_path / "styled-output.png")
+
+
+def test_validate_output_image_path_rejects_unsupported_suffix(tmp_path) -> None:
+    with pytest.raises(ValidationError, match="supported suffixes"):
+        validate_output_image_path(tmp_path / "styled-output.txt")

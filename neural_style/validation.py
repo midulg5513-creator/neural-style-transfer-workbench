@@ -10,6 +10,7 @@ from .config import (
     MAX_STYLE_STRENGTH,
     MIN_NUM_STEPS,
     MIN_STYLE_STRENGTH,
+    SUPPORTED_IMAGE_SUFFIXES,
 )
 from .utils import build_output_paths, ensure_directory, is_supported_image_path
 
@@ -50,6 +51,9 @@ def require_cuda() -> "torch.device":
 
 def validate_image_path(value: str | Path, field_name: str) -> Path:
     """Validate an image-like filesystem path."""
+    if value in (None, ""):
+        raise ValidationError(f"Please choose a {field_name}.")
+
     path = Path(value).expanduser()
     if not path.exists():
         raise ValidationError(f"{field_name} does not exist: {path}")
@@ -107,12 +111,28 @@ def normalize_output_path(value: str | Path | None) -> Path:
     return image_path
 
 
+def validate_output_image_path(value: str | Path | None) -> Path:
+    """Validate the requested output image path and enforce a supported suffix."""
+    image_path = normalize_output_path(value)
+    if image_path.suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
+        supported = ", ".join(sorted(SUPPORTED_IMAGE_SUFFIXES))
+        raise ValidationError(
+            "output image must use one of the supported suffixes: "
+            f"{supported}"
+        )
+    return image_path
+
+
 def build_startup_status_message() -> str:
     """Summarize the startup environment state for the UI."""
     try:
-        import torch  # noqa: F401
+        import torch
     except ModuleNotFoundError:
         return TORCH_MISSING_MESSAGE
     if is_cuda_ready():
-        return "CUDA detected. The project can continue with GPU-only execution."
+        device_name = torch.cuda.get_device_name(torch.cuda.current_device())
+        return (
+            "CUDA detected. The project can continue with GPU-only execution.\n"
+            f"Active GPU: {device_name}"
+        )
     return CUDA_REQUIRED_MESSAGE
