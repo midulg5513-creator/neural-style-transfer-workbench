@@ -145,7 +145,11 @@ def save_run_metadata(
     metadata_path: str | Path | None = None,
 ) -> Path:
     """Write a metadata sidecar JSON file and return its resolved path."""
-    payload = metadata.to_dict() if isinstance(metadata, RunMetadata) else _normalize_json_value(dict(metadata))
+    payload = (
+        metadata.to_dict()
+        if isinstance(metadata, RunMetadata)
+        else _normalize_json_value(dict(metadata))
+    )
     target_path = (
         Path(metadata_path).expanduser()
         if metadata_path not in (None, "")
@@ -161,12 +165,27 @@ def save_run_metadata(
 
 def format_run_summary(metadata: RunMetadata | Mapping[str, Any]) -> str:
     """Build a short text summary suitable for the desktop UI."""
-    payload = metadata.to_dict() if isinstance(metadata, RunMetadata) else _normalize_json_value(dict(metadata))
+    payload = (
+        metadata.to_dict()
+        if isinstance(metadata, RunMetadata)
+        else _normalize_json_value(dict(metadata))
+    )
     inputs = payload.get("inputs", {})
     parameters = payload.get("parameters", {})
     runtime = payload.get("runtime", {})
     artifacts = payload.get("artifacts", {})
     keep_color = parameters.get("keep_color", None)
+    content_blend = parameters.get("content_blend", None)
+    tv_weight = parameters.get("tv_weight", None)
+    histogram_weight = parameters.get("histogram_weight", None)
+    histogram_enabled = parameters.get("histogram_loss", None)
+    init_mode = parameters.get("init_mode", None)
+    use_avg_pool = parameters.get("use_avg_pool", None)
+    enhanced_mode = parameters.get("enhanced_mode", None)
+    paper_mode = parameters.get("paper_mode", None)
+    backbone = parameters.get("backbone", None)
+    layer_preset = parameters.get("layer_preset", None)
+    scale_schedule = parameters.get("scale_schedule", None)
     mask_image = inputs.get("mask_image", None)
 
     lines = [
@@ -176,8 +195,19 @@ def format_run_summary(metadata: RunMetadata | Mapping[str, Any]) -> str:
         f"输出图像：{artifacts.get('output_image', '未知')}",
         f"参数记录：{artifacts.get('metadata_file', '未知')}",
         f"运行设备：{runtime.get('cuda_device_name') or runtime.get('device', '未知')}",
-        f"迭代步数：{parameters.get('num_steps', '未知')}",
+        f"优化步数：{parameters.get('num_steps', '未知')}",
         f"风格强度：{parameters.get('style_strength', '未知')}",
+        f"原图保留度：{content_blend if content_blend is not None else '未知'}",
+        f"TV 正则：{tv_weight if tv_weight is not None else '未知'}",
+        f"直方图损失：{'是' if histogram_enabled else '否' if histogram_enabled is not None else '未知'}",
+        f"直方图权重：{histogram_weight if histogram_weight is not None else '未知'}",
+        f"初始化模式：{init_mode if init_mode is not None else '未知'}",
+        f"平均池化：{'是' if use_avg_pool else '否' if use_avg_pool is not None else '未知'}",
+        f"强化模式：{'是' if enhanced_mode else '否' if enhanced_mode is not None else '未知'}",
+        f"论文模式：{'是' if paper_mode else '否' if paper_mode is not None else '未知'}",
+        f"特征骨干：{backbone if backbone is not None else '未知'}",
+        f"层配置：{layer_preset if layer_preset is not None else '未知'}",
+        f"多尺度：{scale_schedule if scale_schedule is not None else '未知'}",
         f"图像尺寸：{parameters.get('image_size', '未知')}",
         f"保留原色：{'是' if keep_color is True else '否' if keep_color is False else '未知'}",
         f"使用遮罩：{'是' if mask_image else '否'}",

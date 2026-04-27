@@ -1,4 +1,4 @@
-"""Mask helpers for local style-transfer blending."""
+"""Mask helpers for local style-transfer control and blending."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from .config import DEFAULT_IMAGE_SIZE
-from .utils import load_image_tensor
+from .utils import load_image_tensor, pil_image_to_tensor
 
 
 def normalize_mask_tensor(mask_tensor: torch.Tensor) -> torch.Tensor:
@@ -37,9 +37,25 @@ def normalize_mask_tensor(mask_tensor: torch.Tensor) -> torch.Tensor:
 def load_mask_tensor(
     path: str | Path,
     target_size: int = DEFAULT_IMAGE_SIZE,
+    target_shape: tuple[int, int] | None = None,
     device: torch.device | str | None = None,
 ) -> torch.Tensor:
     """Load a mask image from disk and normalize it for blending."""
+    if target_shape is not None:
+        target_height, target_width = target_shape
+        if target_height <= 0 or target_width <= 0:
+            raise ValueError("target_shape must contain positive height and width.")
+
+        from PIL import Image
+
+        source_path = Path(path).expanduser()
+        with Image.open(source_path) as image:
+            resized = image.convert("RGB").resize(
+                (target_width, target_height),
+                resample=Image.Resampling.LANCZOS,
+            )
+            return normalize_mask_tensor(pil_image_to_tensor(resized, device=device))
+
     return normalize_mask_tensor(
         load_image_tensor(path, target_size=target_size, device=device)
     )

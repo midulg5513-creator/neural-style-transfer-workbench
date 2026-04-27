@@ -9,7 +9,9 @@ from PySide6.QtCore import Qt, QSize, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
+    QBoxLayout,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -24,6 +26,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QProgressBar,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QTextEdit,
@@ -38,6 +41,7 @@ from neural_style.config import (
     APP_TITLE,
     APP_WINDOW_HEIGHT,
     APP_WINDOW_WIDTH,
+    DEFAULT_CONTENT_BLEND,
     DEFAULT_IMAGE_SIZE,
     DEFAULT_NUM_STEPS,
     DEFAULT_STYLE_STRENGTH,
@@ -46,17 +50,24 @@ from neural_style.config import (
     GUI_MIN_IMAGE_SIZE,
     GUI_PREVIEW_HEIGHT,
     GUI_PREVIEW_WIDTH,
+    MAX_CONTENT_BLEND,
     MAX_NUM_STEPS,
     MAX_STYLE_STRENGTH,
+    MIN_CONTENT_BLEND,
     MIN_NUM_STEPS,
     MIN_STYLE_STRENGTH,
+    ENHANCED_MODE_CONTENT_BLEND,
+    ENHANCED_MODE_NUM_STEPS,
+    ENHANCED_MODE_STYLE_STRENGTH,
 )
-from neural_style.utils import default_output_path, load_preview_png_bytes
+from neural_style.model import BACKBONE_LABELS, DEFAULT_BACKBONE
+from neural_style.utils import default_output_path, load_preview_png_bytes, metadata_output_path
 from neural_style.validation import (
     ValidationError,
     build_startup_status_message,
     is_cuda_ready,
     require_cuda,
+    validate_content_blend,
     validate_image_path,
     validate_image_size,
     validate_num_steps,
@@ -81,7 +92,12 @@ class PreviewPane(QFrame):
         self._source_pixmap: QPixmap | None = None
 
         self.setObjectName("previewPane")
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
         layout = QVBoxLayout(self)
+        self._layout = layout
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
@@ -91,11 +107,19 @@ class PreviewPane(QFrame):
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setWordWrap(True)
-        self.image_label.setMinimumSize(QSize(GUI_PREVIEW_WIDTH, GUI_PREVIEW_HEIGHT))
+        self.image_label.setMinimumSize(QSize(220, 160))
+        self.image_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
         self.image_label.setObjectName("previewImage")
 
         self.caption_label = QLabel()
         self.caption_label.setWordWrap(True)
+        self.caption_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
         self.caption_label.setObjectName("previewCaption")
 
         layout.addWidget(title_label)
@@ -145,6 +169,20 @@ class PreviewPane(QFrame):
         )
         self.image_label.setPixmap(scaled)
 
+    def configure_density(
+        self,
+        *,
+        image_min_size: QSize,
+        min_height: int,
+        margins: tuple[int, int, int, int],
+        spacing: int,
+    ) -> None:
+        """Tune the pane for either hero-preview or compact-reference usage."""
+        self.image_label.setMinimumSize(image_min_size)
+        self.setMinimumHeight(min_height)
+        self._layout.setContentsMargins(*margins)
+        self._layout.setSpacing(spacing)
+
 
 class MainWindow(QMainWindow):
     """Primary application window for desktop style-transfer control."""
@@ -165,136 +203,254 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._bind_events()
         self._refresh_environment_status()
+        self._refresh_live_summary()
+        self._sync_responsive_layouts()
 
     def _apply_window_style(self) -> None:
-        """Apply a light visual treatment for the desktop layout."""
+        """Apply a compact, tool-first visual language inspired by modern AI apps."""
         self.setStyleSheet(
             """
             QMainWindow {
-                background: #eef3ef;
+                background: #eef0e8;
             }
             QWidget {
-                color: #17324d;
-                font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC";
+                color: #161816;
+                font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", "Aptos", "Segoe UI Variable Text";
                 font-size: 13px;
+            }
+            QFrame#appShell {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #fbfbf7,
+                    stop: 1 #f4f6ef
+                );
+                border: 1px solid #dde2d6;
+                border-radius: 28px;
             }
             QScrollArea {
                 background: transparent;
                 border: none;
             }
-            QFrame#heroCard {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #17324d,
-                    stop: 0.55 #1f5f66,
-                    stop: 1 #2f7f67
-                );
-                border-radius: 24px;
-                min-height: 150px;
+            QScrollArea#sidebarScroll {
+                min-width: 344px;
             }
-            QLabel#heroTitle {
-                color: #f5fbf8;
-                font-size: 29px;
+            QSplitter::handle {
+                background: #dfe4da;
+                width: 8px;
+                margin: 8px 0;
+                border-radius: 4px;
+            }
+            QFrame#topBar {
+                background: rgba(255, 255, 255, 0.56);
+                border: 1px solid #e0e4da;
+                border-radius: 20px;
+            }
+            QLabel#topBarTitle {
+                color: #121412;
+                font-size: 28px;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+            }
+            QFrame#sidebarSurface, QFrame#workspaceSurface {
+                background: transparent;
+            }
+            QFrame#workspaceHeader {
+                background: rgba(255, 255, 255, 0.64);
+                border: 1px solid #e1e5db;
+                border-radius: 16px;
+            }
+            QLabel#workspaceTitle {
+                color: #111412;
+                font-size: 18px;
                 font-weight: 700;
             }
-            QLabel#heroSubtitle {
-                color: #d9ede8;
-                font-size: 14px;
+            QFrame#insightCard {
+                background: rgba(255, 255, 255, 0.76);
+                border: 1px solid #e3e7dd;
+                border-radius: 16px;
             }
-            QLabel#heroBadge {
-                background: rgba(255, 255, 255, 0.16);
-                border-radius: 999px;
-                color: #f5fbf8;
-                font-size: 12px;
+            QLabel#insightCardTitle {
+                color: #72796f;
+                font-size: 11px;
                 font-weight: 700;
-                padding: 6px 12px;
+                letter-spacing: 0.9px;
+            }
+            QLabel#insightCardValue {
+                color: #151715;
+                font-size: 17px;
+                font-weight: 700;
+            }
+            QLabel#insightCardMeta {
+                color: #5f675f;
+                line-height: 1.45;
             }
             QGroupBox {
-                background: #fbfdfb;
-                border: 1px solid #d8e4de;
-                border-radius: 16px;
+                background: rgba(250, 251, 247, 0.88);
+                border: 1px solid #e0e5db;
+                border-radius: 18px;
                 font-weight: 600;
-                margin-top: 14px;
-                padding-top: 10px;
+                margin-top: 15px;
+                padding-top: 12px;
             }
             QGroupBox::title {
-                left: 14px;
-                padding: 0 6px;
-                color: #17324d;
+                left: 16px;
+                padding: 0 7px;
+                color: #515a53;
+                font-size: 12px;
             }
-            QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit {
-                background: #f7fbf9;
-                border: 1px solid #c7d6ce;
-                border-radius: 10px;
-                padding: 7px 10px;
+            QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
+                background: #ffffff;
+                border: 1px solid #d7ddd1;
+                border-radius: 12px;
+                padding: 8px 11px;
+                selection-background-color: #171917;
+                selection-color: #f3f5ed;
+            }
+            QLabel#pathFieldLabel {
+                color: #475046;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+            }
+            QLabel#actionHintLabel {
+                color: #576056;
+                line-height: 1.5;
+            }
+            QCheckBox {
+                color: #20241f;
+                spacing: 8px;
+            }
+            QCheckBox#compactToggle {
+                padding: 0;
+                margin: 0;
+                spacing: 0;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 6px;
+                border: 1px solid #c9d0c4;
+                background: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                background: #151917;
+                border-color: #151917;
             }
             QPushButton {
-                background: #1f6f66;
-                border: none;
-                border-radius: 10px;
-                color: white;
+                background: #151917;
+                border: 1px solid #151917;
+                border-radius: 12px;
+                color: #f3f5ec;
                 font-weight: 700;
-                min-height: 36px;
-                padding: 0 16px;
+                min-height: 38px;
+                padding: 0 18px;
+            }
+            QPushButton:hover {
+                background: #262b26;
+                border-color: #262b26;
             }
             QPushButton:disabled {
-                background: #a9c0ba;
-                color: #eef5f2;
+                background: #c9d0c7;
+                border-color: #c9d0c7;
+                color: #eef1ea;
             }
             QPushButton#secondaryButton {
-                background: #d9ebe6;
-                color: #164944;
+                background: #ffffff;
+                border: 1px solid #d6ddd2;
+                color: #171917;
+            }
+            QPushButton#secondaryButton:hover {
+                background: #f2f5ee;
+                border-color: #c4ccc1;
             }
             QPushButton#dangerButton {
-                background: #d16456;
+                background: #8f413b;
+                border-color: #8f413b;
+            }
+            QPushButton#dangerButton:hover {
+                background: #7e3934;
+                border-color: #7e3934;
             }
             QProgressBar {
-                background: #dfebe6;
-                border: 1px solid #cad8d2;
-                border-radius: 10px;
+                background: #edf1e8;
+                border: 1px solid #dce2d7;
+                border-radius: 11px;
                 min-height: 24px;
                 text-align: center;
                 font-weight: 700;
+                color: #273027;
             }
             QProgressBar::chunk {
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 1, y2: 0,
-                    stop: 0 #1f6f66,
-                    stop: 1 #3a8a62
+                    stop: 0 #191c18,
+                    stop: 1 #394137
                 );
-                border-radius: 9px;
+                border-radius: 10px;
             }
             QFrame#previewPane {
-                background: #ffffff;
-                border: 1px solid #d8e4de;
+                background: rgba(255, 255, 255, 0.84);
+                border: 1px solid #e1e6dc;
                 border-radius: 18px;
             }
+            QFrame#primaryPreviewPane {
+                background: rgba(255, 255, 255, 0.92);
+                border: 1px solid #dbe1d6;
+                border-radius: 20px;
+            }
             QLabel#previewTitle {
-                color: #17324d;
-                font-size: 15px;
+                color: #131613;
+                font-size: 14px;
                 font-weight: 700;
             }
             QLabel#previewImage {
-                background: #f5faf8;
-                border: 1px dashed #b8cbc3;
-                border-radius: 14px;
-                color: #5f746d;
-                padding: 14px;
+                background: #f5f7f1;
+                border: 1px solid #e0e5da;
+                border-radius: 16px;
+                color: #6a7268;
+                padding: 16px;
+            }
+            QLabel#heroPreviewImage {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #f7f9f4,
+                    stop: 1 #eef2e9
+                );
+                border: 1px solid #d9dfd4;
+                border-radius: 18px;
+                color: #5f685f;
+                padding: 18px;
             }
             QLabel#previewCaption {
-                color: #4d635d;
+                color: #687067;
+            }
+            QLabel#heroPreviewCaption {
+                color: #586157;
             }
             QLabel#environmentLabel {
-                border-radius: 12px;
+                border-radius: 14px;
                 font-weight: 600;
-                padding: 12px 14px;
+                padding: 13px 15px;
             }
             QLabel#statusLabel {
-                color: #3a5458;
+                color: #596159;
                 line-height: 1.45;
             }
+            QLabel#planDetails {
+                background: #f2f5ee;
+                border: 1px solid #dfe5da;
+                border-radius: 14px;
+                color: #475047;
+                font-family: "Cascadia Code", "JetBrains Mono", "Microsoft YaHei UI";
+                line-height: 1.5;
+                padding: 12px 14px;
+            }
             QTextEdit#summaryBox {
-                background: #f8fbfa;
+                background: #121613;
+                border: 1px solid #2a302a;
+                border-radius: 16px;
+                color: #e8eee4;
+                font-family: "Cascadia Code", "JetBrains Mono", "Microsoft YaHei UI";
                 line-height: 1.55;
             }
             """
@@ -305,55 +461,64 @@ class MainWindow(QMainWindow):
         central = QWidget(self)
         root_layout = QVBoxLayout(central)
         root_layout.setContentsMargins(18, 18, 18, 18)
-        root_layout.setSpacing(14)
+        root_layout.setSpacing(0)
+
+        shell = QFrame()
+        shell.setObjectName("appShell")
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(16, 16, 16, 16)
+        shell_layout.setSpacing(14)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter = splitter
+        splitter.setChildrenCollapsible(False)
         splitter.addWidget(self._build_control_panel())
         splitter.addWidget(self._build_preview_panel())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([420, 820])
+        splitter.setSizes([390, 910])
 
-        root_layout.addWidget(self._build_header_card())
-        root_layout.addWidget(splitter, 1)
+        shell_layout.addWidget(self._build_header_card())
+        shell_layout.addWidget(splitter, 1)
+        root_layout.addWidget(shell)
         self.setCentralWidget(central)
 
     def _build_header_card(self) -> QFrame:
-        """Build the top hero card for the demo-oriented interface."""
+        """Build a compact app bar with calm, tool-oriented framing."""
         card = QFrame()
-        card.setObjectName("heroCard")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 22, 24, 22)
-        layout.setSpacing(14)
+        card.setObjectName("topBar")
+        layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, card)
+        self._top_bar_layout = layout
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(16)
 
-        title_label = QLabel("神经风格迁移桌面演示界面")
-        title_label.setObjectName("heroTitle")
-        subtitle_label = QLabel(
-            "本地 GPU 风格迁移流程，支持内容图、风格图、可选遮罩、保留原色与参数 JSON 留档。"
+        title_widget = QWidget()
+        title_widget.setMinimumWidth(0)
+        title_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
         )
-        subtitle_label.setObjectName("heroSubtitle")
-        subtitle_label.setWordWrap(True)
+        title_column = QVBoxLayout(title_widget)
+        title_column.setSpacing(6)
+        title_column.setContentsMargins(0, 0, 0, 0)
 
-        badge_row = QHBoxLayout()
-        badge_row.setSpacing(8)
-        for text in ("本地桌面版", "GPU 专用", "离线演示可用"):
-            badge_row.addWidget(self._create_badge(text))
-        badge_row.addStretch(1)
+        title_label = QLabel("风格迁移工作台")
+        self.top_bar_title_label = title_label
+        title_label.setObjectName("topBarTitle")
+        title_column.addWidget(title_label)
 
-        layout.addLayout(badge_row)
-        layout.addWidget(title_label)
-        layout.addWidget(subtitle_label)
+        layout.addWidget(title_widget, 1)
         return card
-
-    def _create_badge(self, text: str) -> QLabel:
-        """Create a small rounded badge used in the header."""
-        badge = QLabel(text)
-        badge.setObjectName("heroBadge")
-        return badge
 
     def _build_control_panel(self) -> QWidget:
         """Build the left-side form panel with inputs and actions."""
-        panel_container = QWidget()
+        panel_container = QFrame()
+        panel_container.setObjectName("sidebarSurface")
+        panel_container.setMinimumWidth(0)
+        panel_container.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         panel_layout = QVBoxLayout(panel_container)
         panel_layout.setContentsMargins(0, 0, 0, 0)
         panel_layout.setSpacing(12)
@@ -365,69 +530,152 @@ class MainWindow(QMainWindow):
         panel_layout.addStretch(1)
 
         scroll_area = QScrollArea()
+        scroll_area.setObjectName("sidebarScroll")
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         scroll_area.setWidget(panel_container)
+        self.sidebar_scroll = scroll_area
         return scroll_area
+
+    def _build_workspace_header(self) -> QFrame:
+        """Build a compact header for the preview workspace."""
+        card = QFrame()
+        card.setObjectName("workspaceHeader")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(12)
+
+        title = QLabel("预览与结果")
+        self.workspace_title_label = title
+        title.setObjectName("workspaceTitle")
+        layout.addWidget(title, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        return card
 
     def _build_preview_panel(self) -> QWidget:
         """Build the right-side preview and output summary area."""
-        container = QWidget()
+        container = QFrame()
+        container.setObjectName("workspaceSurface")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        preview_grid = QGridLayout()
-        preview_grid.setSpacing(12)
+        layout.addWidget(self._build_workspace_header())
+        layout.addWidget(self._build_live_summary_group())
+
         self.content_preview = PreviewPane(
-            "内容图预览",
-            "选择内容图后，会在这里显示缩略预览。",
+            "内容参考",
+            "选择内容图后，这里会显示参考缩略图。",
+        )
+        self.content_preview.configure_density(
+            image_min_size=QSize(148, 78),
+            min_height=132,
+            margins=(12, 12, 12, 12),
+            spacing=8,
         )
         self.style_preview = PreviewPane(
-            "风格图预览",
-            "选择风格图后，会在这里显示缩略预览。",
+            "风格参考",
+            "选择风格图后，这里会显示参考缩略图。",
+        )
+        self.style_preview.configure_density(
+            image_min_size=QSize(148, 78),
+            min_height=132,
+            margins=(12, 12, 12, 12),
+            spacing=8,
         )
         self.result_preview = PreviewPane(
-            "结果预览",
-            "生成完成后，会在这里显示输出结果。",
+            "结果画布",
+            "生成完成后，这里会显示最终输出图像。",
         )
-        preview_grid.addWidget(self.content_preview, 0, 0)
-        preview_grid.addWidget(self.style_preview, 0, 1)
-        preview_grid.addWidget(self.result_preview, 1, 0, 1, 2)
+        self.result_preview.setObjectName("primaryPreviewPane")
+        self.result_preview.image_label.setObjectName("heroPreviewImage")
+        self.result_preview.caption_label.setObjectName("heroPreviewCaption")
+        self.result_preview.configure_density(
+            image_min_size=QSize(300, 220),
+            min_height=340,
+            margins=(16, 16, 16, 16),
+            spacing=10,
+        )
 
-        summary_group = QGroupBox("结果与记录")
+        source_column = QWidget()
+        self.source_column = source_column
+        source_column.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Expanding,
+        )
+        source_layout = QBoxLayout(QBoxLayout.Direction.TopToBottom, source_column)
+        self.source_preview_layout = source_layout
+        source_layout.setContentsMargins(0, 0, 0, 0)
+        source_layout.setSpacing(12)
+        source_layout.addWidget(self.content_preview, 1)
+        source_layout.addWidget(self.style_preview, 1)
+        source_column.setMinimumWidth(280)
+        source_column.setMaximumWidth(340)
+        source_column.setMinimumHeight(276)
+
+        top_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.preview_splitter = top_splitter
+        top_splitter.setChildrenCollapsible(False)
+        top_splitter.setMinimumHeight(320)
+        top_splitter.addWidget(self.result_preview)
+        top_splitter.addWidget(source_column)
+        top_splitter.setStretchFactor(0, 1)
+        top_splitter.setStretchFactor(1, 0)
+        top_splitter.setSizes([760, 300])
+
+        summary_group = QGroupBox("运行记录")
         summary_layout = QVBoxLayout(summary_group)
         self.output_summary = QTextEdit()
         self.output_summary.setObjectName("summaryBox")
         self.output_summary.setReadOnly(True)
-        self.output_summary.setMinimumHeight(170)
+        self.output_summary.setMinimumHeight(190)
         self.output_summary.setPlainText(
-            "输出图像路径、参数 JSON 路径和本次运行摘要会显示在这里。"
+            "这里会显示输出路径、参数记录、损失信息和本次运行摘要。"
         )
         summary_layout.addWidget(self.output_summary)
 
-        layout.addLayout(preview_grid, 1)
+        layout.addWidget(top_splitter)
         layout.addWidget(summary_group)
-        return container
+
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("workspaceScroll")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll_area.setWidget(container)
+        self.workspace_scroll = scroll_area
+        return scroll_area
 
     def _build_environment_group(self) -> QGroupBox:
         """Build the environment-status section."""
-        group = QGroupBox("运行环境")
+        group = QGroupBox("设备状态")
         layout = QVBoxLayout(group)
         layout.setSpacing(10)
 
         self.environment_label = QLabel()
         self.environment_label.setWordWrap(True)
+        self.environment_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         self.environment_label.setObjectName("environmentLabel")
 
-        self.status_label = QLabel("当前已就绪。请选择内容图和风格图，然后设置参数开始生成。")
+        self.status_label = QLabel("选择内容图和风格图后即可开始生成。")
         self.status_label.setObjectName("statusLabel")
         self.status_label.setWordWrap(True)
+        self.status_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("待命")
+        self.progress_bar.setFormat("待开始")
 
         layout.addWidget(self.environment_label)
         layout.addWidget(self.status_label)
@@ -436,41 +684,45 @@ class MainWindow(QMainWindow):
 
     def _build_input_group(self) -> QGroupBox:
         """Build file path controls for content, style, mask, and output."""
-        group = QGroupBox("输入与输出")
+        group = QGroupBox("素材与输出")
         layout = QVBoxLayout(group)
         layout.setSpacing(12)
 
         self.content_input, self.content_browse_button = self._create_path_row(
             layout,
-            "内容图像",
-            placeholder_text="请选择内容图，例如：examples\\content.jpg",
+            "内容图",
+            placeholder_text="例如：examples\\content.jpg",
         )
         self.style_input, self.style_browse_button = self._create_path_row(
             layout,
-            "风格图像",
-            placeholder_text="请选择风格图，例如：examples\\style.jpg",
+            "风格图",
+            placeholder_text="例如：examples\\style.jpg",
         )
         self.mask_input, self.mask_browse_button = self._create_path_row(
             layout,
-            "遮罩图像（可选）",
+            "遮罩图（可选）",
             include_clear_button=True,
             placeholder_text="局部风格迁移时可选，用于限定生效区域。",
         )
         self.output_input, self.output_browse_button = self._create_path_row(
             layout,
-            "输出图像",
+            "输出图",
             save_dialog=True,
-            placeholder_text="默认会输出到 outputs\\result.png，并同步生成 JSON 参数文件。",
+            placeholder_text="默认输出到 outputs\\result.png，并同步生成 JSON 参数文件。",
         )
         self.output_input.setText(str(default_output_path()))
         return group
 
     def _build_parameter_group(self) -> QGroupBox:
         """Build parameter widgets for the NST run settings."""
-        group = QGroupBox("参数设置")
+        group = QGroupBox("生成参数")
         form = QFormLayout(group)
         form.setContentsMargins(16, 18, 16, 14)
         form.setSpacing(12)
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
 
         self.steps_spin = QSpinBox()
         self.steps_spin.setRange(MIN_NUM_STEPS, MAX_NUM_STEPS)
@@ -483,17 +735,118 @@ class MainWindow(QMainWindow):
         self.style_strength_spin.setDecimals(2)
         self.style_strength_spin.setValue(DEFAULT_STYLE_STRENGTH)
 
+        self.content_blend_spin = QDoubleSpinBox()
+        self.content_blend_spin.setRange(MIN_CONTENT_BLEND, MAX_CONTENT_BLEND)
+        self.content_blend_spin.setSingleStep(0.05)
+        self.content_blend_spin.setDecimals(2)
+        self.content_blend_spin.setValue(DEFAULT_CONTENT_BLEND)
+        self.content_blend_spin.setToolTip("数值越高，结果越接近原图。")
+
         self.image_size_spin = QSpinBox()
         self.image_size_spin.setRange(GUI_MIN_IMAGE_SIZE, GUI_MAX_IMAGE_SIZE)
         self.image_size_spin.setSingleStep(64)
         self.image_size_spin.setValue(DEFAULT_IMAGE_SIZE)
 
-        self.keep_color_checkbox = QCheckBox("保留原图色彩")
+        self.backbone_combo = QComboBox()
+        for backbone_name, label in BACKBONE_LABELS.items():
+            self.backbone_combo.addItem(label, backbone_name)
+        self.backbone_combo.setCurrentIndex(
+            self.backbone_combo.findData(DEFAULT_BACKBONE)
+        )
+        self.backbone_combo.setToolTip(
+            "VGG19 用于论文复现基线，ResNet50 用于扩展对比实验。"
+        )
+
+        self.keep_color_checkbox = self._create_compact_toggle(
+            "保留内容图像原有色彩，仅迁移纹理与笔触。"
+        )
+        self.histogram_loss_checkbox = self._create_compact_toggle(
+            "增加 activation histogram matching，减少伪影和脏纹理。"
+        )
+        self.histogram_loss_checkbox.setToolTip(
+            "增加 activation histogram matching，减少伪影和脏纹理。"
+        )
+        self.enhanced_mode_checkbox = self._create_compact_toggle(
+            "使用平均池化、内容加噪声初始化和更激进的默认参数，强化风格表达。"
+        )
+        self.enhanced_mode_checkbox.setToolTip(
+            "使用平均池化、内容加噪声初始化和更激进的默认参数，强化风格表达。"
+        )
+        self.enhanced_preset_button = QPushButton("强化预设")
+        self.enhanced_preset_button.setToolTip("一键填入强化模式推荐参数。")
+        self.enhanced_preset_button.setObjectName("secondaryButton")
+        self.reset_parameters_button = QPushButton("恢复默认")
+        self.reset_parameters_button.setToolTip("恢复到项目默认参数组合。")
+        self.reset_parameters_button.setObjectName("secondaryButton")
+
+        preset_actions = QWidget()
+        preset_actions.setObjectName("presetPanel")
+        preset_layout = QHBoxLayout(preset_actions)
+        preset_layout.setContentsMargins(0, 0, 0, 0)
+        preset_layout.setSpacing(8)
+        preset_layout.addWidget(self.enhanced_preset_button)
+        preset_layout.addWidget(self.reset_parameters_button)
+        preset_layout.addStretch(1)
 
         form.addRow("优化步数", self.steps_spin)
         form.addRow("风格强度", self.style_strength_spin)
+        form.addRow("原图保留度", self.content_blend_spin)
         form.addRow("图像尺寸", self.image_size_spin)
-        form.addRow("色彩保留", self.keep_color_checkbox)
+        form.addRow("特征骨干", self.backbone_combo)
+        form.addRow("保留色彩", self.keep_color_checkbox)
+        form.addRow("直方图约束", self.histogram_loss_checkbox)
+        form.addRow("强化模式", self.enhanced_mode_checkbox)
+        form.addRow("", preset_actions)
+        return group
+
+    def _create_compact_toggle(self, tooltip: str = "") -> QCheckBox:
+        """Create a label-free toggle control for compact form rows."""
+        checkbox = QCheckBox()
+        checkbox.setObjectName("compactToggle")
+        checkbox.setText("")
+        checkbox.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+        if tooltip:
+            checkbox.setToolTip(tooltip)
+        return checkbox
+
+    def _build_live_summary_group(self) -> QGroupBox:
+        """Build a compact live summary for the current generation plan."""
+        group = QGroupBox("当前方案")
+        self.live_summary_group = group
+        layout = QVBoxLayout(group)
+        layout.setSpacing(10)
+
+        cards_layout = QGridLayout()
+        self.summary_cards_layout = cards_layout
+        cards_layout.setHorizontalSpacing(10)
+        cards_layout.setVerticalSpacing(10)
+
+        mode_card, self.mode_value_label, self.mode_meta_label = self._create_insight_card("模式")
+        size_card, self.size_value_label, self.size_meta_label = self._create_insight_card("输出规格")
+        balance_card, self.balance_value_label, self.balance_meta_label = self._create_insight_card("风格倾向")
+        control_card, self.control_value_label, self.control_meta_label = self._create_insight_card("附加控制")
+        self.summary_cards = [
+            mode_card,
+            size_card,
+            balance_card,
+            control_card,
+        ]
+
+        self._apply_summary_card_layout(columns=2)
+
+        self.plan_details_label = QLabel()
+        self.plan_details_label.setObjectName("planDetails")
+        self.plan_details_label.setWordWrap(True)
+        self.plan_details_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
+
+        layout.addLayout(cards_layout)
+        layout.addWidget(self.plan_details_label)
         return group
 
     def _build_action_group(self) -> QGroupBox:
@@ -502,9 +855,10 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(group)
         layout.setSpacing(10)
 
-        button_row = QHBoxLayout()
-        self.run_button = QPushButton("开始生成")
-        self.cancel_button = QPushButton("取消任务")
+        button_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.action_button_layout = button_row
+        self.run_button = QPushButton("开始风格迁移")
+        self.cancel_button = QPushButton("取消当前任务")
         self.cancel_button.setObjectName("dangerButton")
         self.cancel_button.setEnabled(False)
 
@@ -512,14 +866,49 @@ class MainWindow(QMainWindow):
         button_row.addWidget(self.cancel_button)
 
         self.action_hint_label = QLabel(
-            "任务会在后台线程中执行，界面不会因为风格迁移而卡死。生成完成后会同时保存图像与 JSON 参数记录。"
+            "任务会在后台线程执行，界面保持响应。完成后会同时保存输出图像和 JSON 参数记录。"
         )
+        self.action_hint_label.setObjectName("actionHintLabel")
         self.action_hint_label.setWordWrap(True)
-        self.action_hint_label.setStyleSheet("color: #4d635d; line-height: 1.45;")
+        self.action_hint_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
 
         layout.addLayout(button_row)
         layout.addWidget(self.action_hint_label)
         return group
+
+    def _create_insight_card(self, title: str) -> tuple[QFrame, QLabel, QLabel]:
+        """Create a small card used by the live plan summary."""
+        card = QFrame()
+        card.setObjectName("insightCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(6)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("insightCardTitle")
+        value_label = QLabel()
+        value_label.setObjectName("insightCardValue")
+        value_label.setWordWrap(True)
+        value_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
+        meta_label = QLabel()
+        meta_label.setObjectName("insightCardMeta")
+        meta_label.setWordWrap(True)
+        meta_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
+
+        layout.addWidget(title_label)
+        layout.addWidget(value_label)
+        layout.addWidget(meta_label)
+        layout.addStretch(1)
+        return card, value_label, meta_label
 
     def _create_path_row(
         self,
@@ -532,7 +921,7 @@ class MainWindow(QMainWindow):
     ) -> tuple[QLineEdit, QPushButton]:
         """Create a labeled file-picker row."""
         label = QLabel(label_text)
-        label.setStyleSheet("font-weight: 600; color: #17324d;")
+        label.setObjectName("pathFieldLabel")
 
         row_layout = QHBoxLayout()
         row_layout.setSpacing(8)
@@ -540,9 +929,14 @@ class MainWindow(QMainWindow):
         line_edit = QLineEdit()
         line_edit.setPlaceholderText(placeholder_text)
         line_edit.setClearButtonEnabled(True)
+        line_edit.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
         browse_button = QPushButton("选择")
         browse_button.setObjectName("secondaryButton")
         browse_button.setProperty("save_dialog", save_dialog)
+        browse_button.setMinimumWidth(64)
 
         row_layout.addWidget(line_edit, 1)
         row_layout.addWidget(browse_button)
@@ -550,6 +944,7 @@ class MainWindow(QMainWindow):
         if include_clear_button:
             clear_button = QPushButton("清空")
             clear_button.setObjectName("secondaryButton")
+            clear_button.setMinimumWidth(64)
             clear_button.clicked.connect(line_edit.clear)
             row_layout.addWidget(clear_button)
 
@@ -569,11 +964,161 @@ class MainWindow(QMainWindow):
             lambda: self._pick_image_file(self.mask_input)
         )
         self.output_browse_button.clicked.connect(self._pick_output_file)
+        self.enhanced_preset_button.clicked.connect(self._apply_enhanced_preset)
+        self.reset_parameters_button.clicked.connect(self._reset_parameters_to_default)
         self.run_button.clicked.connect(self._start_run)
         self.cancel_button.clicked.connect(self._request_cancel)
         self.content_input.editingFinished.connect(self._refresh_source_previews)
         self.style_input.editingFinished.connect(self._refresh_source_previews)
+        self.content_input.textChanged.connect(self._refresh_live_summary)
+        self.style_input.textChanged.connect(self._refresh_live_summary)
+        self.mask_input.textChanged.connect(self._refresh_live_summary)
+        self.output_input.textChanged.connect(self._refresh_live_summary)
+        self.steps_spin.valueChanged.connect(self._refresh_live_summary)
+        self.style_strength_spin.valueChanged.connect(self._refresh_live_summary)
+        self.content_blend_spin.valueChanged.connect(self._refresh_live_summary)
+        self.image_size_spin.valueChanged.connect(self._refresh_live_summary)
+        self.backbone_combo.currentIndexChanged.connect(self._refresh_live_summary)
+        self.keep_color_checkbox.toggled.connect(self._refresh_live_summary)
+        self.histogram_loss_checkbox.toggled.connect(self._refresh_live_summary)
+        self.enhanced_mode_checkbox.toggled.connect(self._refresh_live_summary)
         self.run_button.setEnabled(self._cuda_ready)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        """Keep the tool layout stable when the window width changes."""
+        super().resizeEvent(event)
+        self._sync_responsive_layouts()
+
+    def _sync_responsive_layouts(self) -> None:
+        """Adjust layout directions and grids for narrower window widths."""
+        if hasattr(self, "_top_bar_layout"):
+            top_bar_direction = QBoxLayout.Direction.LeftToRight
+            if self._top_bar_layout.direction() != top_bar_direction:
+                self._top_bar_layout.setDirection(top_bar_direction)
+
+        if hasattr(self, "action_button_layout") and hasattr(self, "sidebar_scroll"):
+            sidebar_width = self.sidebar_scroll.viewport().width()
+            action_direction = (
+                QBoxLayout.Direction.TopToBottom
+                if sidebar_width < 360
+                else QBoxLayout.Direction.LeftToRight
+            )
+            if self.action_button_layout.direction() != action_direction:
+                self.action_button_layout.setDirection(action_direction)
+
+        if hasattr(self, "preview_splitter") and hasattr(self, "source_column"):
+            preview_orientation = Qt.Orientation.Horizontal
+            if self.preview_splitter.orientation() != preview_orientation:
+                self.preview_splitter.setOrientation(preview_orientation)
+                if preview_orientation == Qt.Orientation.Vertical:
+                    self.source_preview_layout.setDirection(
+                        QBoxLayout.Direction.LeftToRight
+                    )
+                    self.source_column.setMinimumWidth(0)
+                    self.source_column.setMaximumWidth(16777215)
+                    self.preview_splitter.setSizes([440, 260])
+                else:
+                    self.source_preview_layout.setDirection(
+                        QBoxLayout.Direction.TopToBottom
+                    )
+                    self.source_column.setMinimumWidth(240)
+                    self.source_column.setMaximumWidth(340)
+                    self.preview_splitter.setSizes([760, 300])
+
+        if hasattr(self, "summary_cards"):
+            summary_group_width = self.live_summary_group.width() if hasattr(self, "live_summary_group") else self.width()
+            if summary_group_width >= 760:
+                summary_columns = 4
+            elif summary_group_width >= 480:
+                summary_columns = 2
+            else:
+                summary_columns = 1
+            self._apply_summary_card_layout(columns=summary_columns)
+            self._refresh_summary_cards_geometry()
+
+        for label in (
+            getattr(self, "top_bar_subtitle_label", None),
+            getattr(self, "top_bar_meta_label", None),
+            getattr(self, "workspace_subtitle_label", None),
+            getattr(self, "environment_label", None),
+            getattr(self, "status_label", None),
+            getattr(self, "plan_details_label", None),
+            getattr(self, "action_hint_label", None),
+        ):
+            if label is not None:
+                self._fit_wrapped_label_height(label, extra_padding=4)
+
+    def _apply_summary_card_layout(self, columns: int) -> None:
+        """Place summary cards in one or two columns depending on width."""
+        if not hasattr(self, "summary_cards_layout") or not hasattr(self, "summary_cards"):
+            return
+        if getattr(self, "_summary_columns", None) == columns:
+            return
+
+        while self.summary_cards_layout.count():
+            item = self.summary_cards_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+
+        for index, card in enumerate(self.summary_cards):
+            row = index // columns
+            col = index % columns
+            self.summary_cards_layout.addWidget(card, row, col)
+
+        for col in range(len(self.summary_cards)):
+            self.summary_cards_layout.setColumnStretch(col, 1 if col < columns else 0)
+
+        self._summary_columns = columns
+
+    def _refresh_summary_cards_geometry(self) -> None:
+        """Keep plan summary cards readable after text or width changes."""
+        if not hasattr(self, "summary_cards"):
+            return
+
+        card_specs = [
+            (self.summary_cards[0], self.mode_value_label, self.mode_meta_label),
+            (self.summary_cards[1], self.size_value_label, self.size_meta_label),
+            (self.summary_cards[2], self.balance_value_label, self.balance_meta_label),
+            (self.summary_cards[3], self.control_value_label, self.control_meta_label),
+        ]
+        for card, value_label, meta_label in card_specs:
+            self._fit_wrapped_label_height(value_label, extra_padding=2)
+            self._fit_wrapped_label_height(meta_label, extra_padding=2)
+            card.setMinimumHeight(max(84, card.layout().sizeHint().height() + 6))
+            card.updateGeometry()
+        if hasattr(self, "live_summary_group"):
+            content_height = (
+                self.summary_cards_layout.sizeHint().height()
+                + self.plan_details_label.height()
+                + 62
+            )
+            self.live_summary_group.setMinimumHeight(max(182, content_height))
+
+    def _fit_wrapped_label_height(
+        self,
+        label: QLabel,
+        *,
+        extra_padding: int = 0,
+    ) -> None:
+        """Resize a wrapped label vertically so text is never clipped."""
+        if not label.wordWrap():
+            return
+
+        available_width = label.contentsRect().width() or label.width()
+        if available_width <= 0:
+            available_width = max(label.sizeHint().width(), 120)
+
+        text_rect = label.fontMetrics().boundingRect(
+            0,
+            0,
+            available_width,
+            4000,
+            Qt.TextFlag.TextWordWrap,
+            label.text(),
+        )
+        label.setFixedHeight(text_rect.height() + extra_padding)
+        label.updateGeometry()
 
     def _pick_image_file(self, target_input: QLineEdit) -> None:
         """Open an image file picker and store the selected path."""
@@ -597,6 +1142,148 @@ class MainWindow(QMainWindow):
         )
         if selected_path:
             self.output_input.setText(selected_path)
+
+    def _apply_enhanced_preset(self) -> None:
+        """Apply the stronger preset tuned for the enhanced mode."""
+        self.enhanced_mode_checkbox.setChecked(True)
+        self.steps_spin.setValue(max(self.steps_spin.value(), ENHANCED_MODE_NUM_STEPS))
+        self.style_strength_spin.setValue(ENHANCED_MODE_STYLE_STRENGTH)
+        self.content_blend_spin.setValue(ENHANCED_MODE_CONTENT_BLEND)
+        self.keep_color_checkbox.setChecked(False)
+        self.histogram_loss_checkbox.setChecked(False)
+
+    def _current_backbone(self) -> str:
+        """Return the currently selected style-transfer backbone name."""
+        return str(self.backbone_combo.currentData() or DEFAULT_BACKBONE)
+
+    def _current_backbone_short_label(self) -> str:
+        """Return a compact label for the selected backbone."""
+        return "VGG19" if self._current_backbone() == DEFAULT_BACKBONE else "ResNet50"
+
+    def _reset_parameters_to_default(self) -> None:
+        """Restore the editable generation parameters to the default profile."""
+        self.steps_spin.setValue(DEFAULT_NUM_STEPS)
+        self.style_strength_spin.setValue(DEFAULT_STYLE_STRENGTH)
+        self.content_blend_spin.setValue(DEFAULT_CONTENT_BLEND)
+        self.image_size_spin.setValue(DEFAULT_IMAGE_SIZE)
+        self.backbone_combo.setCurrentIndex(self.backbone_combo.findData(DEFAULT_BACKBONE))
+        self.keep_color_checkbox.setChecked(False)
+        self.histogram_loss_checkbox.setChecked(False)
+        self.enhanced_mode_checkbox.setChecked(False)
+
+    def _refresh_live_summary(self, *_args: object) -> None:
+        """Refresh the live plan cards and execution hint from current form values."""
+        enhanced_mode = self.enhanced_mode_checkbox.isChecked()
+        keep_color = self.keep_color_checkbox.isChecked()
+        histogram_loss = self.histogram_loss_checkbox.isChecked()
+        has_mask = bool(self.mask_input.text().strip())
+        image_size = self.image_size_spin.value()
+        style_strength = self.style_strength_spin.value()
+        content_blend = self.content_blend_spin.value()
+        backbone_name = self._current_backbone()
+        backbone_label = self.backbone_combo.currentText().strip()
+        backbone_short_label = self._current_backbone_short_label()
+
+        output_path = Path(self.output_input.text().strip() or default_output_path()).expanduser()
+        if not output_path.suffix:
+            output_path = output_path.with_suffix(".png")
+        metadata_path = metadata_output_path(output_path)
+
+        if enhanced_mode:
+            mode_value = "强化模式"
+            mode_meta = "更强纹理、更少原图约束，适合追求明显风格表现。"
+        else:
+            mode_value = "标准模式"
+            mode_meta = "均衡配置，适合常规生成与快速冒烟验证。"
+
+        self.mode_value_label.setText(mode_value)
+        self.mode_meta_label.setText(f"{mode_meta} 当前骨干：{backbone_label}。")
+
+        self.size_value_label.setText(f"{image_size} px")
+        self.size_meta_label.setText("按最长边缩放，结果图会保持原始宽高比。")
+
+        self.balance_value_label.setText(
+            f"风格 {style_strength:.2f} / 保留 {content_blend:.2f}"
+        )
+        self.balance_meta_label.setText(
+            self._describe_style_profile(
+                style_strength,
+                content_blend,
+                enhanced_mode,
+                histogram_loss,
+            )
+        )
+
+        self.control_value_label.setText(
+            " | ".join(
+                [
+                    f"骨干 {backbone_short_label}",
+                    f"保色 {'开' if keep_color else '关'}",
+                    f"遮罩 {'开' if has_mask else '关'}",
+                    f"直方图 {'开' if histogram_loss else '关'}",
+                ]
+            )
+        )
+        self.control_meta_label.setText("输出时会同时保存 PNG 图像与 JSON 参数记录。")
+
+        self.plan_details_label.setText(
+            "\n".join(
+                [
+                    f"内容：{self._format_path_for_display(self.content_input.text().strip(), '未选择内容图')}",
+                    f"风格：{self._format_path_for_display(self.style_input.text().strip(), '未选择风格图')}",
+                    f"骨干：{backbone_name}",
+                    f"输出：{self._format_path_for_display(str(output_path), 'outputs/result.png')}",
+                    f"记录：{self._format_path_for_display(str(metadata_path), metadata_path.name)}",
+                ]
+            )
+        )
+
+        hint_bits = [
+            mode_value,
+            backbone_short_label,
+            f"最长边 {image_size}px",
+            "保色开启" if keep_color else "允许改色",
+            "局部遮罩" if has_mask else "全局作用",
+        ]
+        if histogram_loss:
+            hint_bits.append("直方图稳定")
+        self.action_hint_label.setText(
+            "当前方案："
+            + " / ".join(hint_bits)
+            + "。任务会在后台线程执行，完成后自动保存图像与 JSON 参数记录。"
+        )
+        self._sync_responsive_layouts()
+
+    def _describe_style_profile(
+        self,
+        style_strength: float,
+        content_blend: float,
+        enhanced_mode: bool,
+        histogram_loss: bool,
+    ) -> str:
+        """Describe the current style profile in a short user-facing sentence."""
+        if histogram_loss:
+            return "当前会额外约束激活分布，通常能减少脏纹理和局部伪影。"
+        if enhanced_mode:
+            return "笔触更重、纹理更明显，适合追求接近论文示例的强风格化结果。"
+        if style_strength >= 2.0 or content_blend <= 0.1:
+            return "当前偏强风格，结构保留较少，结果会更远离原图。"
+        if content_blend >= 0.45:
+            return "当前偏轻风格，结果会更贴近原图结构与颜色。"
+        return "当前为均衡风格，适合大多数常规演示场景。"
+
+    def _format_path_for_display(self, raw_path: str, fallback: str) -> str:
+        """Format a filesystem path for compact display inside the live summary."""
+        if not raw_path:
+            return fallback
+
+        path = Path(raw_path).expanduser()
+        if path.is_absolute():
+            try:
+                return str(path.relative_to(Path.cwd()))
+            except ValueError:
+                return path.name if len(str(path)) > 56 else str(path)
+        return str(path)
 
     def _refresh_environment_status(self) -> None:
         """Update the environment banner and current run availability."""
@@ -675,6 +1362,7 @@ class MainWindow(QMainWindow):
         output_path = validate_output_image_path(self.output_input.text().strip())
         num_steps = validate_num_steps(self.steps_spin.value())
         style_strength = validate_style_strength(self.style_strength_spin.value())
+        content_blend = validate_content_blend(self.content_blend_spin.value())
         image_size = validate_image_size(self.image_size_spin.value())
 
         return StyleTransferRunRequest(
@@ -684,8 +1372,13 @@ class MainWindow(QMainWindow):
             output_path=output_path,
             num_steps=num_steps,
             style_strength=style_strength,
+            content_blend=content_blend,
             image_size=image_size,
             keep_color=self.keep_color_checkbox.isChecked(),
+            backbone=self._current_backbone(),
+            histogram_loss=self.histogram_loss_checkbox.isChecked(),
+            enhanced_mode=self.enhanced_mode_checkbox.isChecked(),
+            paper_mode=False,
         )
 
     def _start_run(self) -> None:
@@ -755,6 +1448,7 @@ class MainWindow(QMainWindow):
                     result.metadata_summary,
                     f"内容损失：{result.content_loss:.6f}",
                     f"风格损失：{result.style_loss:.6f}",
+                    f"直方图损失：{result.histogram_loss:.6f}",
                     f"应用遮罩：{'是' if result.applied_mask else '否'}",
                 ]
             )
@@ -805,8 +1499,14 @@ class MainWindow(QMainWindow):
             self.output_browse_button,
             self.steps_spin,
             self.style_strength_spin,
+            self.content_blend_spin,
             self.image_size_spin,
+            self.backbone_combo,
             self.keep_color_checkbox,
+            self.histogram_loss_checkbox,
+            self.enhanced_mode_checkbox,
+            self.enhanced_preset_button,
+            self.reset_parameters_button,
         ):
             widget.setEnabled(not is_running)
 

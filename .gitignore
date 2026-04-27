@@ -1,11 +1,25 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest_tmp/
 *.pyc
 *.pyo
 *.pyd
 
 .workflow/
+.project-surgeon-lite/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/
+build/
+dist/
+*.egg-info/
 
 outputs/*
 !outputs/.gitignore
+
+artifacts/
+tmp/
+tmp_*/
+report_copy.docx

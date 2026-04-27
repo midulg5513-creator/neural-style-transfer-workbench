@@ -6,10 +6,15 @@ from pathlib import Path
 
 from .config import (
     DEFAULT_OUTPUT_DIR,
+    INIT_MODE_CHOICES,
+    MAX_CONTENT_BLEND,
     MAX_NUM_STEPS,
     MAX_STYLE_STRENGTH,
+    MIN_CONTENT_BLEND,
     MIN_NUM_STEPS,
     MIN_STYLE_STRENGTH,
+    DEFAULT_HISTOGRAM_WEIGHT,
+    MIN_TV_WEIGHT,
     SUPPORTED_IMAGE_SUFFIXES,
 )
 from .utils import build_output_paths, ensure_directory, is_supported_image_path
@@ -91,6 +96,40 @@ def validate_style_strength(value: float) -> float:
             "风格强度必须在 "
             f"{MIN_STYLE_STRENGTH} 到 {MAX_STYLE_STRENGTH} 之间。"
         )
+    return value
+
+
+def validate_content_blend(value: float) -> float:
+    """Validate the requested content-preservation blend ratio."""
+    if not MIN_CONTENT_BLEND <= value <= MAX_CONTENT_BLEND:
+        raise ValidationError(
+            "原图保留度必须在 "
+            f"{MIN_CONTENT_BLEND} 到 {MAX_CONTENT_BLEND} 之间。"
+        )
+    return value
+
+
+def validate_tv_weight(value: float) -> float:
+    """Validate the total-variation regularization weight."""
+    if value < MIN_TV_WEIGHT:
+        raise ValidationError(
+            f"TV 正则权重必须大于或等于 {MIN_TV_WEIGHT}。"
+        )
+    return value
+
+
+def validate_histogram_weight(value: float) -> float:
+    """Validate the histogram-loss weight."""
+    if value < DEFAULT_HISTOGRAM_WEIGHT:
+        raise ValidationError("直方图损失权重必须大于或等于 0。")
+    return value
+
+
+def validate_init_mode(value: str) -> str:
+    """Validate the image initialization mode."""
+    if value not in INIT_MODE_CHOICES:
+        supported = ", ".join(INIT_MODE_CHOICES)
+        raise ValidationError(f"初始化模式必须是以下之一：{supported}")
     return value
 
 

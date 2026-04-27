@@ -1,42 +1,29 @@
-# 神经风格迁移演示系统
+# 神经风格迁移工作台
 
-计算机视觉期末项目，本地桌面形态，技术栈为 `Python + PyTorch + PySide6`。
+一个基于 `Python + PyTorch + PySide6` 的桌面版神经风格迁移项目，提供命令行和图形界面两种使用方式。项目以 `Gatys + LBFGS` 为核心流程，支持 `VGG19` 与 `ResNet50` 两种特征骨干，并补充了保色、局部遮罩、强化模式、论文模式与元数据留档等工程化能力。
 
-当前已完成：
+## 功能特性
 
-- 基于 `VGG19 + Gatys + LBFGS` 的神经风格迁移主流程
-- `style_strength`、`keep_color`、`mask` 三个扩展功能
-- PySide6 图形界面，支持后台线程运行、进度反馈、预览对比、结果保存
-- 输出图像与同名 `JSON` 参数记录文件
+- 基于 `VGG19 + Gatys + LBFGS` 的经典神经风格迁移流程
+- 可切换 `VGG19` / `ResNet50` 特征骨干
+- 支持 `keep_color`、`mask`、`style_strength`
+- 支持 `enhanced_mode` 与 `paper_mode`
+- 支持 `histogram loss` 以改善局部纹理稳定性
+- 提供 `CLI` 与 `PySide6 GUI`
+- 结果图像会同时生成同名 `JSON` 运行记录
 
-## 运行前提
-
-本项目是明确的 `仅 GPU` 方案，不提供 CPU 回退。
-
-运行机器必须满足：
+## 环境要求
 
 - Windows
-- NVIDIA 显卡
-- PyTorch CUDA 版本安装正确
+- NVIDIA GPU
+- 安装了 CUDA 版 PyTorch
 - `torch.cuda.is_available()` 返回 `True`
 
-## 已验证环境
+当前仓库默认按 `GPU-only` 方案设计，不提供 CPU 回退。
 
-以下版本已经在当前演示机器上实际验证通过：
+## 快速开始
 
-- Python: `3.13.0`
-- torch: `2.7.1+cu126`
-- torchvision: `0.22.1+cu126`
-- PySide6: `6.8.3`
-- Pillow: `12.1.1`
-- scikit-image: `0.25.2`
-- pytest: `8.4.2`
-- GPU: `NVIDIA GeForce RTX 4060 Laptop GPU`
-- PyTorch CUDA build: `12.6`
-
-## 安装步骤
-
-在项目根目录执行：
+### 1. 安装依赖
 
 ```powershell
 python -m venv .venv
@@ -44,165 +31,112 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-安装完成后，先验证 CUDA 是否真的可用：
+如果你的环境不是 `cu126`，建议先按照 [PyTorch 官方安装说明](https://pytorch.org/get-started/locally/) 安装匹配的 CUDA 版 `torch` / `torchvision`，再补装其余依赖。
+
+### 2. 检查 CUDA
 
 ```powershell
 .\.venv\Scripts\python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO CUDA')"
 ```
 
-预期结果：
-
-- `torch.__version__` 为 `2.7.1+cu126`
-- `torch.cuda.is_available()` 为 `True`
-- 能正确输出 `NVIDIA GeForce RTX 4060 Laptop GPU`
-
-## 离线预热
-
-答辩前必须先预热一次预训练权重：
+### 3. 预热模型权重
 
 ```powershell
 .\.venv\Scripts\python cli.py warmup
 ```
 
-当前机器上的缓存目录已经验证为：
+这一步会缓存 `VGG19` 和 `ResNet50` 所需权重，便于后续离线运行。
 
-```text
-C:\Users\33124\.cache\torch\hub\checkpoints
-```
-
-其中 `VGG19` 权重文件应存在：
-
-```text
-vgg19-dcbb9e9d.pth
-```
-
-如果这个文件没有缓存成功，不要直接进入离线演示。
-
-## CLI 快速运行
+### 4. 运行 CLI
 
 ```powershell
 .\.venv\Scripts\python cli.py run `
-  --content .\你的内容图.png `
-  --style .\你的风格图.png `
+  --content .\path\to\content.png `
+  --style .\path\to\style.png `
   --output .\outputs\demo-result.png `
   --steps 300 `
   --style-strength 1.0 `
   --image-size 768 `
+  --backbone vgg19 `
   --keep-color
 ```
 
-如需局部风格迁移，可额外加入：
+如果需要局部风格迁移，可以额外加入：
 
 ```powershell
-  --mask .\你的遮罩图.png
+  --mask .\path\to\mask.png
 ```
 
-## GUI 运行
+如需更接近论文风格的参数组合，可使用：
+
+```powershell
+.\.venv\Scripts\python cli.py run `
+  --content .\path\to\content.png `
+  --style .\path\to\style.png `
+  --output .\outputs\paper-result.png `
+  --steps 1000 `
+  --image-size 768 `
+  --paper-mode
+```
+
+### 5. 启动 GUI
 
 ```powershell
 .\.venv\Scripts\python app_gui.py
 ```
 
-GUI 当前已支持完整演示流程：
+GUI 支持选择内容图、风格图、遮罩图、输出路径和主要参数，并会在后台线程中完成生成，避免界面卡死。
 
-1. 选择内容图和风格图
-2. 可选选择遮罩图
-3. 设置输出图像路径
-4. 调整步数、风格强度、图像尺寸、保留原色
-5. 点击“开始生成”
-6. 查看进度条、三块预览和结果摘要
+## 仓库结构
 
-## 已验证的离线排练路径
-
-当前机器已经完成过以下排练检查：
-
-- `.\.venv\Scripts\python cli.py warmup` 成功，`VGG19` 权重已缓存
-- GUI 可以正常启动，并在后台线程中完成风格迁移
-- 运行结束后会同时生成结果图像和同名 `JSON` 参数文件
-
-推荐排练参数：
-
-- 步数：`50`
-- 风格强度：`1.0`
-- 图像尺寸：`256`
-
-这组参数更适合作为答辩前的快速冒烟验证。
-
-## 输出说明
-
-每次成功运行后，默认会在 `outputs/` 下得到两份文件：
-
-- 结果图像，例如 `outputs\demo-result.png`
-- 参数记录，例如 `outputs\demo-result.json`
-
-JSON 会记录：
-
-- 输入图路径
-- 输出图路径
-- 迭代步数
-- 风格强度
-- 图像尺寸
-- 是否保留原色
-- 运行设备与 PyTorch 信息
-
-## 演示前冒烟清单
-
-正式展示前建议按这个顺序检查：
-
-1. `nvidia-smi` 能正常执行
-2. `.\.venv\Scripts\python -c "import torch; print(torch.cuda.is_available())"` 输出 `True`
-3. `.\.venv\Scripts\python cli.py warmup` 成功
-4. `.\.venv\Scripts\python app_gui.py` 能正常启动
-5. 用一组小图做一次快速生成，确认图片和 JSON 都能落盘
-
-推荐快速冒烟命令：
-
-```powershell
-.\.venv\Scripts\python cli.py run `
-  --content .\你的内容图.png `
-  --style .\你的风格图.png `
-  --output .\outputs\smoke.png `
-  --steps 50 `
-  --style-strength 1.0 `
-  --image-size 256
+```text
+.
+├─ app_gui.py
+├─ cli.py
+├─ neural_style/
+├─ docs/
+├─ examples/
+├─ outputs/
+└─ tests/
 ```
 
-## 常见问题
+- `neural_style/`：核心算法、模型封装、校验与工具函数
+- `docs/`：中文使用文档与实验说明
+- `examples/`：示例素材约定说明
+- `outputs/`：默认输出目录，仅保留占位文件
+- `tests/`：自动化测试
 
-- 如果“开始生成”按钮不可点，通常是 CUDA 不可用。
-- 如果提示找不到内容图或风格图，先检查路径是否真实存在。
-- 如果提示输出后缀不支持，请使用 `.png`、`.jpg`、`.jpeg`、`.bmp` 或 `.webp`。
-- 如果第一次运行很慢，通常是 CUDA 初始化和模型权重首次加载导致，答辩前先做 `warmup`。
+## 输出内容
 
-## 报告与答辩要点
+每次成功运行后，默认会在 `outputs/` 中生成：
 
-如果需要在课程报告或现场讲解中快速说明项目，可以按下面这条线索：
+- 一张结果图像，例如 `outputs\demo-result.png`
+- 一份同名参数记录，例如 `outputs\demo-result.json`
 
-- 架构选择：本项目采用 `PySide6 GUI + PyTorch NST 核心 + 后台线程 worker` 的本地桌面结构。
-- 算法选择：核心算法为 `VGG19 + Gatys 风格迁移 + LBFGS`，适合课程项目场景，结果直观且易于解释。
-- 三个扩展点：
-  - `style_strength`：控制风格化强度
-  - `keep_color`：在风格迁移后保留原图色彩分布
-  - `mask`：让风格迁移只作用于局部区域
-- 工程化补强：
-  - GPU-only 环境校验
-  - 图形界面后台线程执行，避免卡死
-  - 输出图像与 JSON 参数记录同步落盘
-  - 支持离线预热和答辩前冒烟检查
+`JSON` 中会记录输入路径、输出路径、步数、风格强度、骨干网络、运行设备等信息，便于复现实验。
 
-## 最终手动检查清单
+## 测试
 
-正式展示前，建议逐项确认：
+```powershell
+.\.venv\Scripts\python -m pytest -q
+```
 
-1. `nvidia-smi` 正常
-2. `torch.cuda.is_available()` 为 `True`
-3. `cli.py warmup` 成功
-4. `app_gui.py` 正常打开
-5. 选择一组内容图/风格图后可以成功生成
-6. 结果图像和同名 JSON 都已写入 `outputs/`
-7. 若要展示局部风格迁移，遮罩图已经提前准备好
+## 已知限制
 
-## 参考文档
+- 当前主要面向 Windows + NVIDIA CUDA 环境
+- 依赖 GPU，不支持 CPU 回退
+- 仓库默认不附带可直接运行的素材图片，使用前请自行准备内容图、风格图和可选遮罩图
+
+## 文档
 
 - `docs/中文操作手册与配置指南.md`
 - `docs/桌面版操作手册.md`
+- `docs/backbone-extension.md`
+- `docs/参考论文与资料.md`
+
+## 发布建议
+
+在正式发布到 GitHub 前，建议再补充两项仓库元信息：
+
+- 选择并添加合适的 `LICENSE`
+- 在仓库首页或 `docs/assets/` 中放置 1 到 2 张界面或结果截图

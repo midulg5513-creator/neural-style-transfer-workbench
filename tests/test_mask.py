@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from PIL import Image
 import pytest
 
 torch = pytest.importorskip("torch")
 
-from neural_style.mask import blend_with_mask, normalize_mask_tensor
+from neural_style.mask import blend_with_mask, load_mask_tensor, normalize_mask_tensor
 
 
 def test_normalize_mask_tensor_reduces_rgb_mask_to_single_channel() -> None:
@@ -44,3 +45,14 @@ def test_blend_with_mask_rejects_spatial_mismatch() -> None:
 
     with pytest.raises(ValueError, match="HxW"):
         blend_with_mask(stylized, content, mask)
+
+
+def test_load_mask_tensor_forces_mask_to_requested_shape(tmp_path) -> None:
+    source_path = tmp_path / "mask.png"
+    Image.new("L", (90, 30), color=255).save(source_path)
+
+    mask = load_mask_tensor(source_path, target_shape=(24, 40), device="cpu")
+
+    assert mask.shape == (1, 1, 24, 40)
+    assert torch.all(mask >= 0.0)
+    assert torch.all(mask <= 1.0)
