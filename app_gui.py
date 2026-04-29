@@ -207,25 +207,21 @@ class MainWindow(QMainWindow):
         self._sync_responsive_layouts()
 
     def _apply_window_style(self) -> None:
-        """Apply a compact, tool-first visual language inspired by modern AI apps."""
+        """Apply a calm, ChatGPT-inspired desktop visual language."""
         self.setStyleSheet(
             """
             QMainWindow {
-                background: #eef0e8;
+                background: #f7f7f5;
             }
             QWidget {
-                color: #161816;
+                color: #1f1f1f;
                 font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", "Aptos", "Segoe UI Variable Text";
                 font-size: 13px;
             }
             QFrame#appShell {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #fbfbf7,
-                    stop: 1 #f4f6ef
-                );
-                border: 1px solid #dde2d6;
-                border-radius: 28px;
+                background: #ffffff;
+                border: 1px solid #e7e7e3;
+                border-radius: 14px;
             }
             QScrollArea {
                 background: transparent;
@@ -235,89 +231,98 @@ class MainWindow(QMainWindow):
                 min-width: 344px;
             }
             QSplitter::handle {
-                background: #dfe4da;
-                width: 8px;
-                margin: 8px 0;
-                border-radius: 4px;
+                background: #efefec;
+                width: 6px;
+                margin: 6px 2px;
+                border-radius: 3px;
             }
             QFrame#topBar {
-                background: rgba(255, 255, 255, 0.56);
-                border: 1px solid #e0e4da;
-                border-radius: 20px;
+                background: transparent;
+                border: none;
+                border-radius: 0;
             }
             QLabel#topBarTitle {
-                color: #121412;
-                font-size: 28px;
+                color: #202123;
+                font-size: 24px;
                 font-weight: 700;
-                letter-spacing: 0.2px;
+                letter-spacing: 0;
             }
-            QFrame#sidebarSurface, QFrame#workspaceSurface {
+            QFrame#sidebarSurface {
+                background: #f7f7f5;
+                border: 1px solid #ececea;
+                border-radius: 10px;
+            }
+            QFrame#workspaceSurface {
                 background: transparent;
             }
             QFrame#workspaceHeader {
-                background: rgba(255, 255, 255, 0.64);
-                border: 1px solid #e1e5db;
-                border-radius: 16px;
+                background: #ffffff;
+                border: 1px solid #ececea;
+                border-radius: 8px;
             }
             QLabel#workspaceTitle {
-                color: #111412;
-                font-size: 18px;
-                font-weight: 700;
-            }
-            QFrame#insightCard {
-                background: rgba(255, 255, 255, 0.76);
-                border: 1px solid #e3e7dd;
-                border-radius: 16px;
-            }
-            QLabel#insightCardTitle {
-                color: #72796f;
-                font-size: 11px;
-                font-weight: 700;
-                letter-spacing: 0.9px;
-            }
-            QLabel#insightCardValue {
-                color: #151715;
+                color: #202123;
                 font-size: 17px;
                 font-weight: 700;
             }
+            QFrame#insightCard {
+                background: #ffffff;
+                border: 1px solid #ececea;
+                border-radius: 8px;
+            }
+            QLabel#insightCardTitle {
+                color: #6b6b67;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0;
+            }
+            QLabel#insightCardValue {
+                color: #202123;
+                font-size: 16px;
+                font-weight: 700;
+            }
             QLabel#insightCardMeta {
-                color: #5f675f;
+                color: #6b6b67;
                 line-height: 1.45;
             }
             QGroupBox {
-                background: rgba(250, 251, 247, 0.88);
-                border: 1px solid #e0e5db;
-                border-radius: 18px;
+                background: #ffffff;
+                border: 1px solid #ececea;
+                border-radius: 8px;
                 font-weight: 600;
-                margin-top: 15px;
+                margin-top: 14px;
                 padding-top: 12px;
             }
             QGroupBox::title {
                 left: 16px;
-                padding: 0 7px;
-                color: #515a53;
+                padding: 0 6px;
+                color: #5f5f5b;
                 font-size: 12px;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
+                background: #f7f7f5;
+                border: 1px solid #deded9;
+                border-radius: 8px;
+                padding: 8px 10px;
+                selection-background-color: #10a37f;
+                selection-color: #ffffff;
+            }
+            QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QComboBox:focus {
                 background: #ffffff;
-                border: 1px solid #d7ddd1;
-                border-radius: 12px;
-                padding: 8px 11px;
-                selection-background-color: #171917;
-                selection-color: #f3f5ed;
+                border: 1px solid #10a37f;
             }
             QLabel#pathFieldLabel {
-                color: #475046;
+                color: #4f4f4b;
                 font-size: 12px;
                 font-weight: 700;
-                letter-spacing: 0.2px;
+                letter-spacing: 0;
             }
             QLabel#actionHintLabel {
-                color: #576056;
+                color: #6b6b67;
                 line-height: 1.5;
             }
             QCheckBox {
-                color: #20241f;
+                color: #202123;
                 spacing: 8px;
             }
             QCheckBox#compactToggle {
@@ -328,130 +333,160 @@ class MainWindow(QMainWindow):
             QCheckBox::indicator {
                 width: 18px;
                 height: 18px;
-                border-radius: 6px;
-                border: 1px solid #c9d0c4;
+                border-radius: 5px;
+                border: 1px solid #d5d5d0;
                 background: #ffffff;
             }
+            QCheckBox::indicator:hover {
+                border-color: #10a37f;
+            }
             QCheckBox::indicator:checked {
-                background: #151917;
-                border-color: #151917;
+                background: #10a37f;
+                border-color: #10a37f;
             }
             QPushButton {
-                background: #151917;
-                border: 1px solid #151917;
-                border-radius: 12px;
-                color: #f3f5ec;
+                background: #10a37f;
+                border: 1px solid #10a37f;
+                border-radius: 8px;
+                color: #ffffff;
                 font-weight: 700;
                 min-height: 38px;
                 padding: 0 18px;
             }
             QPushButton:hover {
-                background: #262b26;
-                border-color: #262b26;
+                background: #0e906f;
+                border-color: #0e906f;
+            }
+            QPushButton:pressed {
+                background: #0b7f62;
+                border-color: #0b7f62;
             }
             QPushButton:disabled {
-                background: #c9d0c7;
-                border-color: #c9d0c7;
-                color: #eef1ea;
+                background: #d9d9d4;
+                border-color: #d9d9d4;
+                color: #f8f8f6;
             }
             QPushButton#secondaryButton {
                 background: #ffffff;
-                border: 1px solid #d6ddd2;
-                color: #171917;
+                border: 1px solid #deded9;
+                color: #202123;
             }
             QPushButton#secondaryButton:hover {
-                background: #f2f5ee;
-                border-color: #c4ccc1;
+                background: #f7f7f5;
+                border-color: #c8c8c2;
             }
             QPushButton#dangerButton {
-                background: #8f413b;
-                border-color: #8f413b;
+                background: #b42318;
+                border-color: #b42318;
             }
             QPushButton#dangerButton:hover {
-                background: #7e3934;
-                border-color: #7e3934;
+                background: #9f1f17;
+                border-color: #9f1f17;
             }
             QProgressBar {
-                background: #edf1e8;
-                border: 1px solid #dce2d7;
-                border-radius: 11px;
+                background: #f0f0ed;
+                border: 1px solid #e0e0db;
+                border-radius: 8px;
                 min-height: 24px;
                 text-align: center;
                 font-weight: 700;
-                color: #273027;
+                color: #3f3f3b;
             }
             QProgressBar::chunk {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 0,
-                    stop: 0 #191c18,
-                    stop: 1 #394137
-                );
-                border-radius: 10px;
+                background: #10a37f;
+                border-radius: 7px;
             }
             QFrame#previewPane {
-                background: rgba(255, 255, 255, 0.84);
-                border: 1px solid #e1e6dc;
-                border-radius: 18px;
+                background: #ffffff;
+                border: 1px solid #ececea;
+                border-radius: 8px;
             }
             QFrame#primaryPreviewPane {
-                background: rgba(255, 255, 255, 0.92);
-                border: 1px solid #dbe1d6;
-                border-radius: 20px;
+                background: #ffffff;
+                border: 1px solid #e6e6e1;
+                border-radius: 8px;
             }
             QLabel#previewTitle {
-                color: #131613;
+                color: #202123;
                 font-size: 14px;
                 font-weight: 700;
             }
             QLabel#previewImage {
                 background: #f5f7f1;
-                border: 1px solid #e0e5da;
-                border-radius: 16px;
-                color: #6a7268;
+                border: 1px dashed #d9d9d2;
+                border-radius: 8px;
+                color: #73736f;
                 padding: 16px;
             }
             QLabel#heroPreviewImage {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #f7f9f4,
-                    stop: 1 #eef2e9
-                );
-                border: 1px solid #d9dfd4;
-                border-radius: 18px;
-                color: #5f685f;
+                background: #f7f7f5;
+                border: 1px dashed #d6d6cf;
+                border-radius: 8px;
+                color: #6b6b67;
                 padding: 18px;
             }
             QLabel#previewCaption {
-                color: #687067;
+                color: #73736f;
             }
             QLabel#heroPreviewCaption {
-                color: #586157;
+                color: #5f5f5b;
             }
             QLabel#environmentLabel {
-                border-radius: 14px;
+                border-radius: 8px;
                 font-weight: 600;
                 padding: 13px 15px;
             }
             QLabel#statusLabel {
-                color: #596159;
+                color: #6b6b67;
                 line-height: 1.45;
             }
             QLabel#planDetails {
-                background: #f2f5ee;
-                border: 1px solid #dfe5da;
-                border-radius: 14px;
-                color: #475047;
+                background: #f7f7f5;
+                border: 1px solid #e3e3de;
+                border-radius: 8px;
+                color: #4f4f4b;
                 font-family: "Cascadia Code", "JetBrains Mono", "Microsoft YaHei UI";
                 line-height: 1.5;
                 padding: 12px 14px;
             }
             QTextEdit#summaryBox {
-                background: #121613;
-                border: 1px solid #2a302a;
-                border-radius: 16px;
-                color: #e8eee4;
+                background: #202123;
+                border: 1px solid #343541;
+                border-radius: 8px;
+                color: #f7f7f5;
                 font-family: "Cascadia Code", "JetBrains Mono", "Microsoft YaHei UI";
                 line-height: 1.55;
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 10px;
+                margin: 4px 0 4px 0;
+            }
+            QScrollBar::handle:vertical {
+                background: #d2d2cc;
+                border-radius: 5px;
+                min-height: 36px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #bdbdb7;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                width: 0;
+            }
+            QScrollBar:horizontal {
+                background: transparent;
+                height: 10px;
+                margin: 0 4px 0 4px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #d2d2cc;
+                border-radius: 5px;
+                min-width: 36px;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                height: 0;
+                width: 0;
             }
             """
         )
@@ -460,14 +495,14 @@ class MainWindow(QMainWindow):
         """Create the window layout and all major interface sections."""
         central = QWidget(self)
         root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(18, 18, 18, 18)
+        root_layout.setContentsMargins(14, 14, 14, 14)
         root_layout.setSpacing(0)
 
         shell = QFrame()
         shell.setObjectName("appShell")
         shell_layout = QVBoxLayout(shell)
-        shell_layout.setContentsMargins(16, 16, 16, 16)
-        shell_layout.setSpacing(14)
+        shell_layout.setContentsMargins(14, 14, 14, 14)
+        shell_layout.setSpacing(12)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self._main_splitter = splitter
@@ -489,7 +524,7 @@ class MainWindow(QMainWindow):
         card.setObjectName("topBar")
         layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, card)
         self._top_bar_layout = layout
-        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setContentsMargins(8, 8, 8, 10)
         layout.setSpacing(16)
 
         title_widget = QWidget()
@@ -520,8 +555,8 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Preferred,
         )
         panel_layout = QVBoxLayout(panel_container)
-        panel_layout.setContentsMargins(0, 0, 0, 0)
-        panel_layout.setSpacing(12)
+        panel_layout.setContentsMargins(10, 10, 10, 10)
+        panel_layout.setSpacing(10)
 
         panel_layout.addWidget(self._build_environment_group())
         panel_layout.addWidget(self._build_input_group())
